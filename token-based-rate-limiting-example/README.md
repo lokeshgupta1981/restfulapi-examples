@@ -1,6 +1,6 @@
 # Token-based rate limiting for LLM APIs: working example
 
-Source code for the article [Token-Based Rate Limiting for LLM and AI Agent APIs](https://restfulapi.net/token-based-rate-limiting-llm-apis/) on restfulapi.net.
+Companion code for the article [Token-Based Rate Limiting for LLM and AI Agent APIs](https://restfulapi.net/token-based-rate-limiting-llm-apis/) on restfulapi.net.
 Tested on 2026-10-02 with Python 3.11, Redis 7.0.15 and the versions in requirements.txt.
 
 ## Files
@@ -9,11 +9,14 @@ Tested on 2026-10-02 with Python 3.11, Redis 7.0.15 and the versions in requirem
 - agent_client.py: simulates an AI agent that sends parallel calls and obeys Retry-After
 
 ## Run
+    git clone https://github.com/lokeshgupta1981/restfulapi-examples.git
+    cd restfulapi-examples/token-based-rate-limiting-example
     python3 -m venv .venv
     source .venv/bin/activate
     pip install -r requirements.txt
 
-    # Redis 7 or newer on localhost:6379, for example:
+    # Redis 7 or newer on localhost:6379. Install it from https://redis.io/docs/latest/operate/oss_and_stack/install/
+    # (on Windows use WSL or Docker), then start it without saving to disk:
     redis-server --port 6379 --save ""
 
     # Terminal 2: fake LLM on port 9000
@@ -29,4 +32,4 @@ Tested on 2026-10-02 with Python 3.11, Redis 7.0.15 and the versions in requirem
       -d '{"messages":[{"role":"user","content":"Summarize the open orders."}],"max_tokens":500}'
     python agent_client.py 6
 
-To use a real provider, set UPSTREAM_URL to an OpenAI-compatible base URL and add its API key to the upstream request in gateway.py.
+To use a real provider, set UPSTREAM_URL to its base URL without the /v1 part (for example https://api.openai.com) and add your provider API key as an Authorization header on the upstream client in gateway.py.
