@@ -1,6 +1,6 @@
 # MCP vs REST API: working example
 
-Companion code for the article [MCP vs REST API: Turning a REST API into an MCP Server](https://restfulapi.net/mcp-vs-rest-api/) on restfulapi.net.
+Source code for the article [MCP vs REST API: Turning a REST API into an MCP Server](https://restfulapi.net/mcp-vs-rest-api/) on restfulapi.net.
 Tested on 2026-10-02 with Python 3.11 and the versions in requirements.txt (MCP protocol 2026-07-28).
 
 ## Files

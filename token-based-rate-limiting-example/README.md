@@ -1,6 +1,6 @@
 # Token-based rate limiting for LLM APIs: working example
 
-Companion code for the article [Token-Based Rate Limiting for LLM and AI Agent APIs](https://restfulapi.net/token-based-rate-limiting-llm-apis/) on restfulapi.net.
+Source code for the article [Token-Based Rate Limiting for LLM and AI Agent APIs](https://restfulapi.net/token-based-rate-limiting-llm-apis/) on restfulapi.net.
 Tested on 2026-10-02 with Python 3.11, Redis 7.0.15 and the versions in requirements.txt.
 
 ## Files
