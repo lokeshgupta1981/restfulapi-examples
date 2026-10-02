@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Streaming answers demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+  textarea { width: 100%; font: inherit; }
+  #answer { white-space: pre-wrap; border: 1px solid #ccc; border-radius: 6px; padding: 1rem; min-height: 6rem; }
+  #log { font-family: monospace; font-size: 0.9rem; color: #555; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Ask the answers API</h1>
+<textarea id="question" rows="2">What are server-sent events?</textarea>
+<p><button id="ask">Ask</button> <button id="stop" disabled>Stop</button></p>
+<div id="answer"></div>
+<pre id="log"></pre>
+<script>
+// Read a fetch() response body and yield one object per server-sent event.
+async function* readEvents(response) {
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  let lastId = null;  // per the spec, the last event ID stays until a new one arrives
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffer += value.replace(/\r\n?/g, "\n");
+    let end;
+    while ((end = buffer.indexOf("\n\n")) >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const ev = { event: "message", data: [] };
+      for (const line of block.split("\n")) {
+        if (line.startsWith(":")) { ev.comment = true; continue; }
+        const i = line.indexOf(":");
+        const field = i < 0 ? line : line.slice(0, i);
+        let val = i < 0 ? "" : line.slice(i + 1);
+        if (val.startsWith(" ")) val = val.slice(1);
+        if (field === "event") ev.event = val;
+        else if (field === "data") ev.data.push(val);
+        else if (field === "id") lastId = val;
+      }
+      if (ev.data.length) yield { event: ev.event, id: lastId, data: ev.data.join("\n") };
+      else if (ev.comment) yield { event: "comment" };
+    }
+  }
+}
+
+const $ = (id) => document.getElementById(id);
+let controller = null;
+
+function log(start, text) {
+  $("log").textContent += "[" + Math.round(performance.now() - start) + " ms] " + text + "\n";
+}
+
+$("ask").onclick = async () => {
+  controller = new AbortController();
+  $("answer").textContent = "";
+  $("log").textContent = "";
+  $("ask").disabled = true;
+  $("stop").disabled = false;
+  const start = performance.now();
+  let tokens = 0;
+  let finished = false;
+  try {
+    const response = await fetch("/v1/answers/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+      body: JSON.stringify({ question: $("question").value }),
+      signal: controller.signal,
+    });
+    log(start, "HTTP " + response.status);
+    if (!response.ok) {
+      log(start, await response.text());
+      return;
+    }
+    for await (const ev of readEvents(response)) {
+      if (ev.event === "comment") log(start, "heartbeat");
+      if (ev.event === "token") {
+        if (tokens === 0) log(start, "first token");
+        tokens++;
+        $("answer").textContent += JSON.parse(ev.data).text;
+      }
+      if (ev.event === "done") { finished = true; log(start, "done: " + ev.data); }
+      if (ev.event === "error") { finished = true; log(start, "error: " + JSON.parse(ev.data).message); }
+    }
+    if (!finished) log(start, "incomplete: the stream closed without a done event");
+  } catch (err) {
+    log(start, err.name === "AbortError" ? "stopped by the user after " + tokens + " tokens" : String(err));
+  } finally {
+    $("ask").disabled = false;
+    $("stop").disabled = true;
+  }
+};
+
+$("stop").onclick = () => controller.abort();
+</script>
+</body>
+</html>

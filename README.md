@@ -8,3 +8,5 @@ and each folder has its own README with the versions used and the run commands.
 |---|---|
 | [mcp-vs-rest-api-example](mcp-vs-rest-api-example/) | [MCP vs REST API: Turning a REST API into an MCP Server](https://restfulapi.net/mcp-vs-rest-api/) |
 | [token-based-rate-limiting-example](token-based-rate-limiting-example/) | [Token-Based Rate Limiting for LLM and AI Agent APIs](https://restfulapi.net/token-based-rate-limiting-llm-apis/) |
+| [oauth-for-ai-agents-example](oauth-for-ai-agents-example/) | [OAuth for AI Agents: Securing Agent Access to REST APIs](https://restfulapi.net/oauth-for-ai-agents/) |
+| [streaming-llm-sse-example](streaming-llm-sse-example/) | [Streaming LLM Responses in REST APIs with Server-Sent Events](https://restfulapi.net/streaming-llm-responses-server-sent-events/) |
