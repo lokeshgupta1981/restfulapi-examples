@@ -1,0 +1,265 @@
+### FastAPI (port 9406)
+$ curl -si -H Accept: application/json http://127.0.0.1:9406/reports/2026-09
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+vary: Accept
+content-length: 134
+content-type: application/json
+
+{"month":"2026-09","rows":[{"region":"north","orders":412,"revenue":"18350.00"},{"region":"south","orders":287,"revenue":"12990.50"}]}
+
+$ curl -si -H Accept: text/csv http://127.0.0.1:9406/reports/2026-09
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+vary: Accept
+content-length: 60
+content-type: text/csv; charset=utf-8
+
+region,orders,revenue
+north,412,18350.00
+south,287,12990.50
+
+
+$ curl -si -H Accept: text/csv;q=0.5, application/json;q=0.4 http://127.0.0.1:9406/reports/2026-09
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+vary: Accept
+content-length: 60
+content-type: text/csv; charset=utf-8
+
+region,orders,revenue
+north,412,18350.00
+south,287,12990.50
+
+
+$ curl -si -H Accept: application/xml http://127.0.0.1:9406/reports/2026-09
+HTTP/1.1 406 Not Acceptable
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+vary: Accept
+content-length: 269
+content-type: application/problem+json
+
+{"type":"https://example.com/problems/not-acceptable","title":"Not Acceptable","status":406,"detail":"No available format matches Accept: application/xml","available":[{"type":"application/json","href":"/reports/2026-09"},{"type":"text/csv","href":"/reports/2026-09"}]}
+
+$ curl -si -H Accept: application/xml, */*;q=0.1 http://127.0.0.1:9406/reports/2026-09
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+vary: Accept
+content-length: 134
+content-type: application/json
+
+{"month":"2026-09","rows":[{"region":"north","orders":412,"revenue":"18350.00"},{"region":"south","orders":287,"revenue":"12990.50"}]}
+
+$ curl -si -H Accept: */*;q=0 http://127.0.0.1:9406/reports/2026-09
+HTTP/1.1 406 Not Acceptable
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+vary: Accept
+content-length: 261
+content-type: application/problem+json
+
+{"type":"https://example.com/problems/not-acceptable","title":"Not Acceptable","status":406,"detail":"No available format matches Accept: */*;q=0","available":[{"type":"application/json","href":"/reports/2026-09"},{"type":"text/csv","href":"/reports/2026-09"}]}
+
+$ curl -si -H Accept: application/xml http://127.0.0.1:9406/plain-reports/2026-09
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:44:13 GMT
+server: uvicorn
+content-length: 134
+content-type: application/json
+
+{"month":"2026-09","rows":[{"region":"north","orders":412,"revenue":"18350.00"},{"region":"south","orders":287,"revenue":"12990.50"}]}
+
+### Express (port 9407)
+$ curl -si -H Accept: text/csv http://127.0.0.1:9407/reports/2026-09
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Accept
+Content-Type: text/csv; charset=utf-8
+Content-Length: 60
+ETag: W/"3c-BWyyx4w8uGOsS/tvt2W+FD5NRSw"
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+region,orders,revenue
+north,412,18350.00
+south,287,12990.50
+
+
+$ curl -si -H Accept: application/xml http://127.0.0.1:9407/reports/2026-09
+HTTP/1.1 406 Not Acceptable
+X-Powered-By: Express
+Vary: Accept
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 269
+ETag: W/"10d-fjwLKdAz00ujthmFYhgg6/u3+9k"
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://example.com/problems/not-acceptable","title":"Not Acceptable","status":406,"detail":"No available format matches Accept: application/xml","available":[{"type":"application/json","href":"/reports/2026-09"},{"type":"text/csv","href":"/reports/2026-09"}]}
+
+$ curl -s -o /dev/null -w %{http_code} %{content_type}\n -H Accept: application/xml http://127.0.0.1:9407/bare-reports/2026-09
+406 text/html; charset=utf-8
+
+
+$ curl -si -H Accept: application/xml http://127.0.0.1:9407/plain-reports/2026-09
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 134
+ETag: W/"86-vX80R4GBvhcdJKgAKRGVzyYbG+M"
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"month":"2026-09","rows":[{"region":"north","orders":412,"revenue":"18350.00"},{"region":"south","orders":287,"revenue":"12990.50"}]}
+
+### Express with NODE_ENV=production (port 9410)
+$ curl -si -H Accept: application/xml http://127.0.0.1:9410/bare-reports/2026-09
+HTTP/1.1 406 Not Acceptable
+X-Powered-By: Express
+Vary: Accept
+Content-Security-Policy: default-src 'none'
+X-Content-Type-Options: nosniff
+Content-Type: text/html; charset=utf-8
+Content-Length: 141
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Not Acceptable</pre>
+</body>
+</html>
+
+
+### Spring Boot (port 9408)
+$ curl -si -H Accept: application/xml http://127.0.0.1:9408/reports/2026-09
+HTTP/1.1 406 
+Accept: application/json, application/*+json
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+{"detail":"Acceptable representations: [application/json, application/*+json].","instance":"/reports/2026-09","status":406,"title":"Not Acceptable"}
+
+$ curl -si -H Accept: application/json http://127.0.0.1:9408/xml-reports/2026-09
+HTTP/1.1 406 
+Accept: application/xml
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+{"detail":"Acceptable representations: [application/xml].","instance":"/xml-reports/2026-09","status":406,"title":"Not Acceptable"}
+
+$ curl -si http://127.0.0.1:9408/xml-reports/2026-09
+HTTP/1.1 500 
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+Connection: close
+
+{"detail":"Failed to write request","instance":"/xml-reports/2026-09","status":500,"title":"Internal Server Error"}
+
+$ curl -si http://127.0.0.1:9408/hidden-reports/2026-09
+HTTP/1.1 200 
+Content-Type: application/json
+Content-Length: 2
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+{}
+
+### Spring Boot with Problem Details turned off (port 9409)
+$ curl -si -H Accept: application/xml http://127.0.0.1:9409/reports/2026-09
+HTTP/1.1 406 
+Accept: application/json, application/*+json
+Content-Length: 0
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+
+
+### Spring Boot without Jackson (port 9411)
+$ curl -si http://127.0.0.1:9411/reports/2026-09
+HTTP/1.1 406 
+Content-Length: 0
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+
+
+### Spring Boot with the custom 406 handler (port 9412)
+$ curl -si -H Accept: application/xml http://127.0.0.1:9412/reports/2026-09
+HTTP/1.1 406 
+Vary: Accept
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+{"detail":"No available format matches Accept: application/xml","instance":"/reports/2026-09","status":406,"title":"Not Acceptable","type":"https://example.com/problems/not-acceptable","available":[{"href":"/reports/2026-09","type":"application/json"},{"href":"/reports/2026-09","type":"application/*+json"}]}
+
+### Spring Boot: HTTP 415 for comparison (port 9408)
+$ curl -si -H Content-Type: text/plain -d call the north team http://127.0.0.1:9408/reports/2026-09/notes
+HTTP/1.1 415 
+Accept: application/json
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+{"detail":"Content-Type 'text/plain' is not supported.","instance":"/reports/2026-09/notes","status":415,"title":"Unsupported Media Type"}
+
+$ curl -si -H Content-Type: text/plain -H Accept: application/xml -d call the north team http://127.0.0.1:9408/reports/2026-09/notes
+HTTP/1.1 415 
+Accept: application/json
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:44:14 GMT
+
+{"detail":"Content-Type 'text/plain' is not supported.","instance":"/reports/2026-09/notes","status":415,"title":"Unsupported Media Type"}
+
+### Client that handles HTTP 406
+$ .venv/bin/python clients/fetch_report.py http://127.0.0.1:9406/reports/2026-09
+application/xml -> 406 application/problem+json
+text/csv -> 200 text/csv; charset=utf-8
+region,orders,revenue
+north,412,18350.00
+south,287,12990.50
+
+
+$ .venv/bin/python clients/fetch_report.py http://127.0.0.1:9407/reports/2026-09
+application/xml -> 406 application/problem+json; charset=utf-8
+text/csv -> 200 text/csv; charset=utf-8
+region,orders,revenue
+north,412,18350.00
+south,287,12990.50
+
+
+$ .venv/bin/python clients/fetch_report.py http://127.0.0.1:9412/reports/2026-09
+application/xml -> 406 application/problem+json
+application/json -> 200 application/json
+{"month":"2026-09","rows":[{"region":"north","orders":412,"revenue":"18350.00"},{"region":"south","orders":287,"revenue":"12990.50"}]}
+
+
+$ .venv/bin/python clients/fetch_report.py http://127.0.0.1:9407/bare-reports/2026-09
+application/xml -> 406 text/html; charset=utf-8
+Error: HTTP 406 without a list of formats; check the Accept default and any firewall
+
+
+$ .venv/bin/python clients/fetch_report.py http://127.0.0.1:9409/reports/2026-09
+application/xml -> 406 (none)
+Error: HTTP 406 without a list of formats; check the Accept default and any firewall
+
+
+### Tests
+...                                                                      [100%]
+3 passed in 0.30s

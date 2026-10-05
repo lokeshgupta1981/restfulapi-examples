@@ -1,0 +1,104 @@
+=== Express: bulk cancel with mixed results ===
+$ curl -si -H Content-Type: application/json -d {"items":[{"orderId":"ord-1001"},{"orderId":"ord-1002"},{"orderId":"ord-9999"}]} http://127.0.0.1:9207/orders/bulk-cancel
+HTTP/1.1 207 Multi-Status
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 450
+ETag: W/"1c2-R02mMQYch76t/llFaVlkAFfXvbI"
+Date: Mon, 05 Oct 2026 12:49:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"results":[{"index":0,"orderId":"ord-1001","status":200,"order":{"id":"ord-1001","state":"cancelled"}},{"index":1,"orderId":"ord-1002","status":409,"error":{"type":"about:blank","title":"Conflict","status":409,"detail":"Order ord-1002 has already shipped."}},{"index":2,"orderId":"ord-9999","status":404,"error":{"type":"about:blank","title":"Not Found","status":404,"detail":"Order ord-9999 does not exist."}}],"summary":{"succeeded":1,"failed":2}}
+
+=== Express: malformed JSON fails the whole request ===
+$ curl -si -H Content-Type: application/json -d {"items": [ http://127.0.0.1:9207/orders/bulk-cancel
+HTTP/1.1 400 Bad Request
+X-Powered-By: Express
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 104
+ETag: W/"68-HLJU0a71k+w7YCeIypuZiJuC+8I"
+Date: Mon, 05 Oct 2026 12:49:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"The request body is not valid JSON."}
+
+=== Express: empty items array ===
+$ curl -si -H Content-Type: application/json -d {"items": []} http://127.0.0.1:9207/orders/bulk-cancel
+HTTP/1.1 422 Unprocessable Entity
+X-Powered-By: Express
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 124
+ETag: W/"7c-2B56UsdIVbI2cpomQUYeubfynhM"
+Date: Mon, 05 Oct 2026 12:49:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"Send \"items\" as an array of 1 to 50 orders."}
+
+=== Node.js fetch() client ===
+status: 207 ok: true
+failed: ord-1002 -> 409 Order ord-1002 has already shipped.
+failed: ord-9999 -> 404 Order ord-9999 does not exist.
+cancelled 1 of 3 orders
+
+=== Python requests client ===
+status: 207 ok: True
+failed order ids: ['ord-1002']
+
+=== WebDAV: PROPFIND with Depth 1 ===
+$ curl -si -X PROPFIND -H Depth: 1 -H Content-Type: application/xml --data <?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:getcontentlength/></d:prop></d:propfind> http://127.0.0.1:9208/reports/
+HTTP/1.1 207 Multi-Status
+Content-Type: application/xml; charset=utf-8
+Date: Mon, 05 Oct 2026 12:49:11 GMT
+Content-Length: 676
+Server: WsgiDAV/4.3.5 Cheroot/11.1.2 Python/3.13.16
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ns0:multistatus xmlns:ns0="DAV:"><ns0:response><ns0:href>/reports/</ns0:href><ns0:propstat><ns0:prop><ns0:getcontentlength /></ns0:prop><ns0:status>HTTP/1.1 404 Not Found</ns0:status></ns0:propstat></ns0:response><ns0:response><ns0:href>/reports/q4.txt</ns0:href><ns0:propstat><ns0:prop><ns0:getcontentlength>17</ns0:getcontentlength></ns0:prop><ns0:status>HTTP/1.1 200 OK</ns0:status></ns0:propstat></ns0:response><ns0:response><ns0:href>/reports/q3.txt</ns0:href><ns0:propstat><ns0:prop><ns0:getcontentlength>17</ns0:getcontentlength></ns0:prop><ns0:status>HTTP/1.1 200 OK</ns0:status></ns0:propstat></ns0:response></ns0:multistatus>
+
+=== WebDAV: LOCK q3.txt, then DELETE the folder ===
+LOCK status: 200
+$ curl -si -X DELETE http://127.0.0.1:9208/reports/
+HTTP/1.1 207 Multi-Status
+Content-Type: application/xml; charset=utf-8
+Date: Mon, 05 Oct 2026 12:49:11 GMT
+Content-Length: 201
+Server: WsgiDAV/4.3.5 Cheroot/11.1.2 Python/3.13.16
+
+<?xml version="1.0" encoding="utf-8" ?>
+<ns0:multistatus xmlns:ns0="DAV:"><ns0:response><ns0:href>/reports/q3.txt</ns0:href><ns0:status>HTTP/1.1 423 Locked</ns0:status></ns0:response></ns0:multistatus>
+
+files left in reports/: q3.txt
+
+=== Spring Boot: bulk cancel with mixed results ===
+$ curl -si -H Content-Type: application/json -d {"items":[{"orderId":"ord-1001"},{"orderId":"ord-1002"},{"orderId":"ord-9999"}]} http://127.0.0.1:9209/orders/bulk-cancel
+HTTP/1.1 207 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 12:49:15 GMT
+
+{"results":[{"index":0,"orderId":"ord-1001","status":200,"detail":"Order ord-1001 is cancelled."},{"index":1,"orderId":"ord-1002","status":409,"detail":"Order ord-1002 has already shipped."},{"index":2,"orderId":"ord-9999","status":404,"detail":"Order ord-9999 does not exist."}],"summary":{"succeeded":1,"failed":2}}
+
+=== node --test ===
+
+> http-status-207-multi-status-example@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: bulk cancel returns HTTP 207 with one result per item
+ok 1 - bulk cancel returns HTTP 207 with one result per item
+  ---
+  duration_ms: 75.096349
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 264.739892

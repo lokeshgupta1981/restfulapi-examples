@@ -1,0 +1,8 @@
+{
+  "name": "www-authenticate-header-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WWW-Authenticate challenge parser and client (no npm dependencies)",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test", "client": "node client.mjs" }
+}
