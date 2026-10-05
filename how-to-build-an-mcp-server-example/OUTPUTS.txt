@@ -1,0 +1,944 @@
+### date: 2026-10-04T18:39:24Z
+### python: Python 3.13.16, node: v22.22.0, npm: 10.9.4
+
+$ python3 -m venv .venv
+[exit 0]
+
+$ .venv/bin/pip install -q -r requirements.txt
+[exit 0]
+
+$ .venv/bin/pip freeze
+annotated-types==0.8.0
+anyio==4.15.1
+attrs==26.1.0
+cffi==2.1.1
+click==8.5.0
+cryptography==50.0.2
+h11==0.16.0
+httpcore2==2.13.1
+httpx2==2.13.1
+idna==3.20
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+mcp==2.3.0
+mcp-types==2.3.0
+opentelemetry-api==1.45.0
+pycparser==3.0
+pydantic==2.13.5
+pydantic_core==2.46.5
+PyJWT==2.15.1
+python-multipart==0.0.32
+referencing==0.37.0
+rpds-py==2026.9.1
+sse-starlette==3.5.0
+starlette==1.7.0
+truststore==0.10.4
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+uvicorn==0.54.0
+[exit 0]
+
+########## stdio
+
+$ python db.py
+Created tasks.db with 2 projects and 6 tasks
+[exit 0]
+
+$ python client.py stdio
+protocol: 2026-07-28
+server: task-tracker 1.0.0
+tools: ['search_tasks', 'create_task', 'complete_task', 'project_report']
+2026-10-04 18:39:34,937 INFO task-tracker: search_tasks project=APP status=todo -> 2 rows
+search_tasks -> {'result': [{'id': 2, 'project': 'APP', 'title': 'Fix crash on Android 15 startup', 'status': 'todo', 'assignee': 'omar', 'due_date': '2026-10-09'}, {'id': 3, 'project': 'APP', 'title': 'Write release notes', 'status': 'todo', 'assignee': None, 'due_date': '2026-10-20'}]}
+2026-10-04 18:39:34,997 INFO mcp.server.mcpserver.server: Tool 'complete_task' failed: 'Error executing tool complete_task: Task 4 is already done. No change was made.'
+complete_task(4) -> is_error: True | Error executing tool complete_task: Task 4 is already done. No change was made.
+  progress 0/2: Counting tasks
+  progress 1/2: Finding overdue tasks
+  progress 2/2: Done
+project_report -> {'project': 'APP', 'total': 4, 'by_status': {'done': 1, 'in_progress': 1, 'todo': 2}, 'overdue': [{'id': 2, 'project': 'APP', 'title': 'Fix crash on Android 15 startup', 'status': 'todo', 'assignee': 'omar', 'due_date': '2026-10-09'}]}
+resource ->
+# Website redesign (WEB)
+Owner: dev
+- #5 New pricing page [in_progress] dev, due 2026-10-12
+- #6 Migrate blog to static site [todo] dev, due no due date
+prompt -> Write a short weekly status update for project WEB. Call project_report for WEB first, then search_tasks with status in_progress. List finished work, work in progress and overdue tasks with their owners. Keep it under 150 words.
+[exit 0]
+
+########## Inspector CLI, stdio
+
+$ python db.py
+Created tasks.db with 2 projects and 6 tasks
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method tools/list
+{
+  "tools": [
+    {
+      "name": "search_tasks",
+      "description": "Find tasks in one project. Filter by status and assignee.\nResults are ordered by due date, tasks without a due date last.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "description": "Project key, for example APP",
+            "title": "Project",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "done"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Username, for example maria",
+            "title": "Assignee"
+          },
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "title": "search_tasksArguments"
+      },
+      "outputSchema": {
+        "$defs": {
+          "Task": {
+            "properties": {
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "project": {
+                "title": "Project",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "done"
+                ],
+                "title": "Status",
+                "type": "string"
+              },
+              "assignee": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Assignee"
+              },
+              "due_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Due Date"
+              }
+            },
+            "required": [
+              "id",
+              "project",
+              "title",
+              "status",
+              "assignee",
+              "due_date"
+            ],
+            "title": "Task",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "result": {
+            "items": {
+              "$ref": "#/$defs/Task"
+            },
+            "title": "Result",
+            "type": "array"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "search_tasksOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "create_task",
+      "description": "Create a task with status todo and return it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "description": "Project key, for example APP",
+            "title": "Project",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Title",
+            "type": "string"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assignee"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due Date"
+          }
+        },
+        "required": [
+          "project",
+          "title"
+        ],
+        "title": "create_taskArguments"
+      },
+      "outputSchema": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "todo",
+              "in_progress",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          }
+        },
+        "required": [
+          "id",
+          "project",
+          "title",
+          "status",
+          "assignee",
+          "due_date"
+        ],
+        "title": "Task",
+        "type": "object"
+      }
+    },
+    {
+      "name": "complete_task",
+      "description": "Mark a task as done. Fails if the task does not exist or is already done.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "title": "Task Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "title": "complete_taskArguments"
+      },
+      "outputSchema": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "todo",
+              "in_progress",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          }
+        },
+        "required": [
+          "id",
+          "project",
+          "title",
+          "status",
+          "assignee",
+          "due_date"
+        ],
+        "title": "Task",
+        "type": "object"
+      },
+      "annotations": {
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "project_report",
+      "description": "Summarize one project: task counts per status and the overdue open tasks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "today": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Report date, defaults to today",
+            "title": "Today"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "title": "project_reportArguments"
+      },
+      "outputSchema": {
+        "$defs": {
+          "Task": {
+            "properties": {
+              "id": {
+                "title": "Id",
+                "type": "integer"
+              },
+              "project": {
+                "title": "Project",
+                "type": "string"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "todo",
+                  "in_progress",
+                  "done"
+                ],
+                "title": "Status",
+                "type": "string"
+              },
+              "assignee": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Assignee"
+              },
+              "due_date": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Due Date"
+              }
+            },
+            "required": [
+              "id",
+              "project",
+              "title",
+              "status",
+              "assignee",
+              "due_date"
+            ],
+            "title": "Task",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Status",
+            "type": "object"
+          },
+          "overdue": {
+            "items": {
+              "$ref": "#/$defs/Task"
+            },
+            "title": "Overdue",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project",
+          "total",
+          "by_status",
+          "overdue"
+        ],
+        "title": "ProjectReport",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method tools/call --tool-name search_tasks --tool-arg project=WEB status=todo
+2026-10-04 18:39:40,585 INFO task-tracker: search_tasks project=WEB status=todo -> 1 rows
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"id\": 6,\n  \"project\": \"WEB\",\n  \"title\": \"Migrate blog to static site\",\n  \"status\": \"todo\",\n  \"assignee\": \"dev\",\n  \"due_date\": null\n}"
+    }
+  ],
+  "structuredContent": {
+    "result": [
+      {
+        "id": 6,
+        "project": "WEB",
+        "title": "Migrate blog to static site",
+        "status": "todo",
+        "assignee": "dev",
+        "due_date": null
+      }
+    ]
+  },
+  "isError": false
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method tools/call --tool-name complete_task --tool-arg task_id=4
+2026-10-04 18:39:43,187 INFO mcp.server.mcpserver.server: Tool 'complete_task' failed: 'Error executing tool complete_task: Task 4 is already done. No change was made.'
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Error executing tool complete_task: Task 4 is already done. No change was made."
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'complete_task' returned isError:true."}}
+[exit 5]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method tools/call --tool-name search_tasks --tool-arg project=APP limit=100
+2026-10-04 18:39:45,894 INFO mcp.server.mcpserver.server: Tool 'search_tasks' rejected arguments: ['limit']
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "Error executing tool search_tasks: 1 validation error for search_tasksArguments\nlimit\n  Input should be less than or equal to 50 [type=less_than_equal, input_value=100, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal"
+    }
+  ],
+  "isError": true
+}
+{"error":{"code":"tool_is_error","message":"Tool 'search_tasks' returned isError:true."}}
+[exit 5]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method tools/call --tool-name delete_everything
+{"error":{"code":"tool_not_found","message":"Tool 'delete_everything' not found on server."}}
+[exit 5]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method resources/list
+{
+  "resources": [
+    {
+      "name": "list_projects",
+      "uri": "tasks://projects",
+      "description": "All projects with their key, name and owner.",
+      "mimeType": "application/json"
+    }
+  ]
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method resources/templates/list
+{
+  "resourceTemplates": [
+    {
+      "name": "project_summary",
+      "uriTemplate": "tasks://projects/{key}/summary",
+      "description": "A short Markdown summary of one project's open tasks.",
+      "mimeType": "text/markdown"
+    }
+  ]
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method resources/read --uri tasks://projects/APP/summary
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "contents": [
+    {
+      "uri": "tasks://projects/APP/summary",
+      "mimeType": "text/markdown",
+      "text": "# Mobile app 2.0 (APP)\nOwner: maria\n\n- #2 Fix crash on Android 15 startup [todo] omar, due 2026-10-09\n- #1 Add login with passkeys [in_progress] maria, due 2026-10-15\n- #3 Write release notes [todo] unassigned, due 2026-10-20"
+    }
+  ],
+  "cacheScope": "private",
+  "ttlMs": 0
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method resources/read --uri tasks://projects/NOPE/summary
+2026-10-04 18:39:57,683 INFO mcp.server.mcpserver.server: Resource 'tasks://projects/NOPE/summary' failed: "No project with key 'NOPE'"
+{"error":{"code":"error","message":"No project with key 'NOPE'"}}
+[exit 1]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli python server.py --protocol-era modern --method prompts/list
+{
+  "prompts": [
+    {
+      "name": "weekly_update",
+      "title": "Weekly status update",
+      "description": "Draft a weekly status update for one project.",
+      "arguments": [
+        {
+          "name": "project",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
+[exit 0]
+
+########## Streamable HTTP
+
+$ python db.py
+Created tasks.db with 2 projects and 6 tasks
+[exit 0]
+
+$ python client.py http
+protocol: 2026-07-28
+server: task-tracker 1.0.0
+tools: ['search_tasks', 'create_task', 'complete_task', 'project_report']
+search_tasks -> {'result': [{'id': 2, 'project': 'APP', 'title': 'Fix crash on Android 15 startup', 'status': 'todo', 'assignee': 'omar', 'due_date': '2026-10-09'}, {'id': 3, 'project': 'APP', 'title': 'Write release notes', 'status': 'todo', 'assignee': None, 'due_date': '2026-10-20'}]}
+complete_task(4) -> is_error: True | Error executing tool complete_task: Task 4 is already done. No change was made.
+  progress 0/2: Counting tasks
+  progress 1/2: Finding overdue tasks
+  progress 2/2: Done
+project_report -> {'project': 'APP', 'total': 4, 'by_status': {'done': 1, 'in_progress': 1, 'todo': 2}, 'overdue': [{'id': 2, 'project': 'APP', 'title': 'Fix crash on Android 15 startup', 'status': 'todo', 'assignee': 'omar', 'due_date': '2026-10-09'}]}
+resource ->
+# Website redesign (WEB)
+Owner: dev
+- #5 New pricing page [in_progress] dev, due 2026-10-12
+- #6 Migrate blog to static site [todo] dev, due no due date
+prompt -> Write a short weekly status update for project WEB. Call project_report for WEB first, then search_tasks with status in_progress. List finished work, work in progress and overdue tasks with their owners. Keep it under 150 words.
+[exit 0]
+
+$ python db.py
+Created tasks.db with 2 projects and 6 tasks
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli http://127.0.0.1:8040/mcp --protocol-era modern --method tools/call --tool-name project_report --tool-arg project=APP today=2026-10-10
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"project\": \"APP\",\n  \"total\": 4,\n  \"by_status\": {\n    \"done\": 1,\n    \"in_progress\": 1,\n    \"todo\": 2\n  },\n  \"overdue\": [\n    {\n      \"id\": 2,\n      \"project\": \"APP\",\n      \"title\": \"Fix crash on Android 15 startup\",\n      \"status\": \"todo\",\n      \"assignee\": \"omar\",\n      \"due_date\": \"2026-10-09\"\n    }\n  ]\n}"
+    }
+  ],
+  "structuredContent": {
+    "project": "APP",
+    "total": 4,
+    "by_status": {
+      "done": 1,
+      "in_progress": 1,
+      "todo": 2
+    },
+    "overdue": [
+      {
+        "id": 2,
+        "project": "APP",
+        "title": "Fix crash on Android 15 startup",
+        "status": "todo",
+        "assignee": "omar",
+        "due_date": "2026-10-09"
+      }
+    ]
+  },
+  "isError": false
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli http://127.0.0.1:8040/mcp --protocol-era modern --method tools/call --tool-name create_task --tool-arg project=WEB 'title=Add cookie banner' assignee=dev due_date=2026-10-30
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"id\": 7,\n  \"project\": \"WEB\",\n  \"title\": \"Add cookie banner\",\n  \"status\": \"todo\",\n  \"assignee\": \"dev\",\n  \"due_date\": \"2026-10-30\"\n}"
+    }
+  ],
+  "structuredContent": {
+    "id": 7,
+    "project": "WEB",
+    "title": "Add cookie banner",
+    "status": "todo",
+    "assignee": "dev",
+    "due_date": "2026-10-30"
+  },
+  "isError": false
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli http://127.0.0.1:8040/mcp --protocol-era modern --method prompts/get --prompt-name weekly_update --prompt-args project=WEB
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "task-tracker",
+      "version": "1.0.0"
+    }
+  },
+  "description": "Draft a weekly status update for one project.",
+  "messages": [
+    {
+      "role": "user",
+      "content": {
+        "type": "text",
+        "text": "Write a short weekly status update for project WEB. Call project_report for WEB first, then search_tasks with status in_progress. List finished work, work in progress and overdue tasks with their owners. Keep it under 150 words."
+      }
+    }
+  ]
+}
+[exit 0]
+
+$ curl -s http://127.0.0.1:8040/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: tools/call' -H 'Mcp-Name: delete_everything' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"delete_everything","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'; echo
+{"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"Unknown tool: delete_everything","type":"text"}],"isError":true,"resultType":"complete","_meta":{"io.modelcontextprotocol/serverInfo":{"name":"task-tracker","version":"1.0.0"}}}}
+[exit 0]
+
+$ curl -s -i http://127.0.0.1:8040/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Origin: https://evil.example' -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: tools/list' -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'; echo
+HTTP/1.1 403 Forbidden
+date: Sun, 04 Oct 2026 18:40:09 GMT
+server: uvicorn
+content-length: 21
+
+Invalid Origin header
+[exit 0]
+
+########## host config file (mcp.json with absolute paths)
+
+$ cat /tmp/mcp-abs.json
+{
+  "mcpServers": {
+    "task-tracker": {
+      "command": "~/how-to-build-an-mcp-server-example/.venv/bin/python",
+      "args": ["~/how-to-build-an-mcp-server-example/server.py"]
+    },
+    "task-tracker-http": {
+      "type": "http",
+      "url": "http://127.0.0.1:8040/mcp"
+    }
+  }
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli --config /tmp/mcp-abs.json --server task-tracker --method prompts/list
+[mcp-inspector] Secrets are not written anywhere and are lost on exit.
+[mcp-inspector] How the secret store is chosen, and how to secure it: https://github.com/modelcontextprotocol/inspector/blob/main/docs/secret-storage.md
+{
+  "prompts": [
+    {
+      "name": "weekly_update",
+      "title": "Weekly status update",
+      "description": "Draft a weekly status update for one project.",
+      "arguments": [
+        {
+          "name": "project",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
+[exit 0]
+
+$ npx -y @modelcontextprotocol/inspector@2.9.0 --cli --config /tmp/mcp-abs.json --server task-tracker-http --method resources/read --uri tasks://projects
+[mcp-inspector] Secrets are not written anywhere and are lost on exit.
+[mcp-inspector] How the secret store is chosen, and how to secure it: https://github.com/modelcontextprotocol/inspector/blob/main/docs/secret-storage.md
+{
+  "contents": [
+    {
+      "uri": "tasks://projects",
+      "mimeType": "application/json",
+      "text": "[{\"key\": \"APP\", \"name\": \"Mobile app 2.0\", \"owner\": \"maria\"}, {\"key\": \"WEB\", \"name\": \"Website redesign\", \"owner\": \"dev\"}]"
+    }
+  ]
+}
+[exit 0]
+
+########## HTTP server log
+INFO:     Started server process [9209]
+INFO:     Waiting for application startup.
+2026-10-04 18:40:01,265 INFO mcp.server.streamable_http_manager: StreamableHTTP session manager started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8040 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53982 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53982 - "POST /mcp HTTP/1.1" 200 OK
+2026-10-04 18:40:04,338 INFO task-tracker: search_tasks project=APP status=todo -> 2 rows
+INFO:     127.0.0.1:53982 - "POST /mcp HTTP/1.1" 200 OK
+2026-10-04 18:40:04,410 INFO mcp.server.mcpserver.server: Tool 'complete_task' failed: 'Error executing tool complete_task: Task 4 is already done. No change was made.'
+INFO:     127.0.0.1:53982 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53982 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53984 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53984 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53998 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54004 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53998 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54018 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53998 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54022 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54038 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54022 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54052 - "POST /mcp HTTP/1.1" 200 OK
+2026-10-04 18:40:07,896 INFO task-tracker: create_task id=7 project=WEB
+INFO:     127.0.0.1:54022 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54064 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54070 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54064 - "POST /mcp HTTP/1.1" 200 OK
+2026-10-04 18:40:09,728 INFO mcp.server.mcpserver.server: Tool 'delete_everything' failed: 'Unknown tool: delete_everything'
+INFO:     127.0.0.1:54076 - "POST /mcp HTTP/1.1" 200 OK
+2026-10-04 18:40:09,737 WARNING mcp.server.transport_security: Invalid Origin header: https://evil.example
+INFO:     127.0.0.1:54082 - "POST /mcp HTTP/1.1" 403 Forbidden
+2026-10-04 18:40:13,490 INFO mcp.server.streamable_http_manager: Created new transport with session ID: 0d3452d1a66348b08ac2c023a5ea2e1f
+INFO:     127.0.0.1:44160 - "POST /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44166 - "POST /mcp HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:44160 - "GET /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44172 - "POST /mcp HTTP/1.1" 200 OK
+
+########## mistakes
+
+$ python print_client.py
+Hello, Ana
+Failed to parse JSONRPC message from server
+Traceback (most recent call last):
+  File "~/how-to-build-an-mcp-server-example/.venv/lib/python3.13/site-packages/mcp/client/stdio.py", line 222, in _parse_line
+    message = types.jsonrpc_message_adapter.validate_json(line, by_name=False)
+  File "~/how-to-build-an-mcp-server-example/.venv/lib/python3.13/site-packages/pydantic/type_adapter.py", line 492, in validate_json
+    return self.validator.validate_json(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        data,
+        ^^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]
+  Invalid JSON: expected value at line 1 column 1 [type=json_invalid, input_value='Starting print-demo server', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
+[exit 0]
+
+$ python blocking_client.py
+blocking_in_async: 3 parallel calls took 3.5 s
+awaited_in_async: 3 parallel calls took 1.2 s
+blocking_in_sync: 3 parallel calls took 1.2 s
+[exit 0]
+
+########## scratch: old FastMCP import on mcp 2.3.0
+$ python -c "from mcp.server.fastmcp import FastMCP"
+    raise ModuleNotFoundError(_MESSAGE, name=__name__)
+ModuleNotFoundError: No module named 'mcp.server.fastmcp'. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin 'mcp<2' to keep running v1 code.
+
+########## mistakes: vague tool definition as the model sees it
+$ cd mistakes && python vague_tool.py
+{
+  "name": "tasks",
+  "description": "Get tasks.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "p": {
+        "title": "P",
+        "type": "string"
+      },
+      "s": {
+        "default": "",
+        "title": "S",
+        "type": "string"
+      }
+    },
+    "required": [
+      "p"
+    ],
+    "title": "tasksArguments"
+  }
+}

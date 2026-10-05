@@ -1,0 +1,12 @@
+extends:
+  - recommended
+
+rules:
+  # Our servers are example hosts on purpose (a demo API and the local mock).
+  no-server-example.com: off
+  # Every operation needs an operationId, because code generators use it as the method name.
+  operation-operationId: error
+  operation-4xx-response: error
+  # Each documented 4xx/5xx response must use Problem Details.
+  operation-4xx-problem-details-rfc7807: error
+  tags-alphabetical: off

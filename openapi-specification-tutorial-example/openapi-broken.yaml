@@ -1,0 +1,115 @@
+openapi: 3.1.2
+info:
+  title: Orders API (with common mistakes)
+  version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: https://api.example.com/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: orders
+paths:
+  /orders:
+    get:
+      summary: List orders
+      tags: [orders]
+      responses:
+        '200':
+          description: A page of orders.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+    post:
+      operationId: createOrder
+      summary: Create an order
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOrder'
+            examples:
+              twoBooks:
+                value:
+                  currency: USD
+                  items:
+                    - sku: BOOK-REST-101
+                      quantity: two
+      responses:
+        '201':
+          description: The order was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oder'
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                type: object
+  /orders/{orderId}:
+    get:
+      operationId: createOrder
+      summary: Get one order
+      tags: [orders]
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Not found.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    OrderItem:
+      type: object
+      required: [sku, quantity]
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+    NewOrder:
+      type: object
+      required: [currency, items]
+      properties:
+        currency:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        note:
+          type: string
+          nullable: true
+    OrderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+    Customer:
+      type: object
+      properties:
+        name:
+          type: string

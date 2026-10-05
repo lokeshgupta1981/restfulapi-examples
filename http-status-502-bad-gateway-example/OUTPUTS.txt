@@ -1,0 +1,153 @@
+
+===== Case 0: app running, normal request
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:38 GMT
+Content-Type: application/json
+Content-Length: 65
+Connection: keep-alive
+
+{"id":"1001","status":"SHIPPED","total":"49.90","currency":"EUR"}
+
+===== Case 1: app down (connection refused), default nginx page
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:39 GMT
+Content-Type: text/html
+Content-Length: 166
+Connection: keep-alive
+
+<html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx/1.24.0 (Ubuntu)</center>
+</body>
+</html>
+--- new lines in logs/error.log:
+2026/10/04 18:43:39 [error] 11435#11435: *3 connect() failed (111: Connection refused) while connecting to upstream, client: 127.0.0.1, server: , request: "GET /orders/1001 HTTP/1.1", upstream: "http://127.0.0.1:9502/orders/1001", host: "127.0.0.1:8502"
+
+===== Case 1b: app down, Problem Details body from nginx
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:39 GMT
+Content-Type: application/problem+json
+Content-Length: 261
+Connection: keep-alive
+Retry-After: 5
+X-Request-Id: 89eaa4b410480a3c9f61caec40712b3f
+
+{"type":"https://example.com/problems/upstream-unavailable","title":"Bad Gateway","status":502,"detail":"The orders service did not return a valid response. Try again in a few seconds.","instance":"/orders/1001","request_id":"89eaa4b410480a3c9f61caec40712b3f"}
+--- new lines in logs/error.log:
+2026/10/04 18:43:39 [error] 11435#11435: *5 connect() failed (111: Connection refused) while connecting to upstream, client: 127.0.0.1, server: , request: "GET /orders/1001 HTTP/1.1", upstream: "http://127.0.0.1:9502/orders/1001", host: "127.0.0.1:8503"
+
+===== Case 2: app process dies before it sends the response
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:41 GMT
+Content-Type: application/problem+json
+Content-Length: 276
+Connection: keep-alive
+Retry-After: 5
+X-Request-Id: 4bbd1b34880ab2347e77628b62c0e147
+
+{"type":"https://example.com/problems/upstream-unavailable","title":"Bad Gateway","status":502,"detail":"The orders service did not return a valid response. Try again in a few seconds.","instance":"/fail/crash-before-response","request_id":"4bbd1b34880ab2347e77628b62c0e147"}
+--- new lines in logs/error.log:
+2026/10/04 18:43:41 [error] 11435#11435: *7 upstream prematurely closed connection while reading response header from upstream, client: 127.0.0.1, server: , request: "GET /fail/crash-before-response HTTP/1.1", upstream: "http://127.0.0.1:9502/fail/crash-before-response", host: "127.0.0.1:8503"
+
+===== Case 3: app process dies in the middle of the response body
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:43 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+curl: (18) transfer closed with outstanding read data remaining
+curl exit code: 18
+body bytes received: 3012
+--- new lines in logs/error.log:
+2026/10/04 18:43:43 [error] 11435#11435: *9 upstream prematurely closed connection while reading upstream, client: 127.0.0.1, server: , request: "GET /fail/crash-mid-body HTTP/1.1", upstream: "http://127.0.0.1:9502/fail/crash-mid-body", host: "127.0.0.1:8502"
+
+===== Case 4: app sends a response header that is too big for proxy_buffer_size
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:45 GMT
+Content-Type: application/problem+json
+Content-Length: 266
+Connection: keep-alive
+Retry-After: 5
+X-Request-Id: 7ff6baae576996155eb53b9c53df07cb
+
+{"type":"https://example.com/problems/upstream-unavailable","title":"Bad Gateway","status":502,"detail":"The orders service did not return a valid response. Try again in a few seconds.","instance":"/fail/huge-header","request_id":"7ff6baae576996155eb53b9c53df07cb"}
+--- new lines in logs/error.log:
+2026/10/04 18:43:45 [error] 11435#11435: *11 upstream sent too big header while reading response header from upstream, client: 127.0.0.1, server: , request: "GET /fail/huge-header HTTP/1.1", upstream: "http://127.0.0.1:9502/fail/huge-header", host: "127.0.0.1:8503"
+
+===== Case 4b: the same request on port 8502, where proxy_buffer_size is 32k
+status=200 header_bytes=16180
+--- new lines in logs/error.log:
+
+===== Case 5: app exits without reading a 900 KB request body (TCP reset)
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 18:43:47 GMT
+Content-Type: application/problem+json
+Content-Length: 260
+Connection: keep-alive
+Retry-After: 5
+X-Request-Id: d06cf42b1669babb85fb979481f177ae
+
+{"type":"https://example.com/problems/upstream-unavailable","title":"Bad Gateway","status":502,"detail":"The orders service did not return a valid response. Try again in a few seconds.","instance":"/fail/reset","request_id":"d06cf42b1669babb85fb979481f177ae"}
+--- new lines in logs/error.log:
+2026/10/04 18:43:47 [warn] 11435#11435: *15 a client request body is buffered to a temporary file tmp/client_body/0000000001, client: 127.0.0.1, server: , request: "POST /fail/reset HTTP/1.1", host: "127.0.0.1:8503"
+2026/10/04 18:43:47 [error] 11435#11435: *15 recv() failed (104: Connection reset by peer) while reading response header from upstream, client: 127.0.0.1, server: , request: "POST /fail/reset HTTP/1.1", upstream: "http://127.0.0.1:9502/fail/reset", host: "127.0.0.1:8503"
+
+===== Access log (upstream_status shows what nginx saw from the app)
+127.0.0.1 "GET /orders/1001 HTTP/1.1" status=200 upstream=127.0.0.1:9502 upstream_status=200 upstream_time=0.016 request_id=b6091b98aaa5b3f22abbb88bf9c2b2fe
+127.0.0.1 "GET /orders/1001 HTTP/1.1" status=502 upstream=127.0.0.1:9502 upstream_status=502 upstream_time=0.000 request_id=a6fee2788c2a217abf1768d01a278c60
+127.0.0.1 "GET /orders/1001 HTTP/1.1" status=502 upstream=127.0.0.1:9502 upstream_status=502 upstream_time=0.000 request_id=89eaa4b410480a3c9f61caec40712b3f
+127.0.0.1 "GET /fail/crash-before-response HTTP/1.1" status=502 upstream=127.0.0.1:9502 upstream_status=502 upstream_time=0.015 request_id=4bbd1b34880ab2347e77628b62c0e147
+127.0.0.1 "GET /fail/crash-mid-body HTTP/1.1" status=200 upstream=127.0.0.1:9502 upstream_status=200 upstream_time=0.022 request_id=23149c0325292ebe151c9c0530c5e7f3
+127.0.0.1 "GET /fail/huge-header HTTP/1.1" status=502 upstream=127.0.0.1:9502 upstream_status=502 upstream_time=0.015 request_id=7ff6baae576996155eb53b9c53df07cb
+127.0.0.1 "GET /fail/huge-header HTTP/1.1" status=200 upstream=127.0.0.1:9502 upstream_status=200 upstream_time=0.002 request_id=4aff32f3cd39ebac28b51896cdfb405d
+127.0.0.1 "POST /fail/reset HTTP/1.1" status=502 upstream=127.0.0.1:9502 upstream_status=502 upstream_time=0.003 request_id=d06cf42b1669babb85fb979481f177ae
+
+===== Client retry demo: app down, it starts 3 seconds after the client
+attempt 1: POST /orders/1001/payments -> 502
+502 application/problem+json
+attempt 1: GET /orders/1001 -> 502
+  waiting 5.00 s before the next attempt
+attempt 2: GET /orders/1001 -> 200
+{"id":"1001","status":"SHIPPED","total":"49.90","currency":"EUR"}
+2026/10/04 18:43:54 [notice] 11597#11597: signal process started
+
+
+
+
+===== Manual reproduction from the article
+$ .venv/bin/uvicorn app:app --host 127.0.0.1 --port 9502 &
+$ mkdir -p logs tmp && nginx -p "$PWD" -c "$PWD/nginx.conf"
+$ pkill -f "uvicorn app:app --host 127.0.0.1 --port 9502"
+$ curl -i http://127.0.0.1:8502/orders/1001
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:05:20 GMT
+Content-Type: text/html
+Content-Length: 166
+Connection: keep-alive
+
+<html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx/1.24.0 (Ubuntu)</center>
+</body>
+</html>
+$ tail -n 1 logs/error.log
+2026/10/04 19:05:20 [error] 14302#14302: *1 connect() failed (111: Connection refused) while connecting to upstream, client: 127.0.0.1, server: , request: "GET /orders/1001 HTTP/1.1", upstream: "http://127.0.0.1:9502/orders/1001", host: "127.0.0.1:8502"
+
+--- path with a double quote on the Problem Details port
+$ curl -sS 'http://127.0.0.1:8503/orders/a"b'
+{"type":"https://example.com/problems/upstream-unavailable","title":"Bad Gateway","status":502,"detail":"The orders service did not return a valid response. Try again in a few seconds.","instance":"/orders/a"b","request_id":"4365fc7d26e15cfe851383aaf0a6850e"}
+
+2026/10/04 19:05:20 [notice] 14308#14308: signal process started

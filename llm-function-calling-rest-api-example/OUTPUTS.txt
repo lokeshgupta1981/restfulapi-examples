@@ -1,0 +1,495 @@
+Captured 2026-10-04T19:35Z on Python 3.13.16, clean venv.
+Model endpoint: local stub (stub_model.py) on port 8781. Orders API on port 8780.
+Note: agent.py prints a piped confirmation answer (input() does not echo input that is not typed in a terminal).
+
+$ pip freeze (relevant)
+fastapi==0.142.2
+httpx==0.28.1
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+pydantic==2.13.5
+pydantic_core==2.46.5
+starlette==1.7.0
+uvicorn==0.54.0
+
+$ ./run_demo.sh
+$ python agent.py --trace What is the status of order 1001?
+--- round 0: request to model ---
+{
+  "model": "stub-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an order support helper. Use the tools to look up real data. Never guess order data. If a tool returns an error, explain it to the user."
+    },
+    {
+      "role": "user",
+      "content": "What is the status of order 1001?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_order",
+        "description": "Get one order by its numeric ID. Returns status, customer, total and currency.",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Numeric order ID, for example 1001"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_shipment",
+        "description": "Get the carrier, tracking number and estimated delivery date of one order.",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Numeric order ID"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancel_order",
+        "description": "Cancel an order that has not shipped yet. Ask the user before calling this tool.",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Numeric order ID"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Short reason given by the customer"
+            }
+          },
+          "required": [
+            "order_id",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto"
+}
+--- round 0: response from model ---
+{
+  "id": "chatcmpl-stub-f58d96fa7b72",
+  "object": "chat.completion",
+  "created": 1791142514,
+  "model": "stub-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_7cd1e837ca6cfb5ef6d07c41",
+            "type": "function",
+            "function": {
+              "name": "get_order",
+              "arguments": "{\"order_id\": 1001}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ]
+}
+[tool] get_order {"order_id": 1001}
+[result] {"ok": true, "status": 200, "data": {"id": 1001, "customer": "Alice", "status": "shipped", "total": "59.90", "currency": "EUR"}}
+--- round 1: request to model ---
+{
+  "model": "stub-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an order support helper. Use the tools to look up real data. Never guess order data. If a tool returns an error, explain it to the user."
+    },
+    {
+      "role": "user",
+      "content": "What is the status of order 1001?"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_7cd1e837ca6cfb5ef6d07c41",
+          "type": "function",
+          "function": {
+            "name": "get_order",
+            "arguments": "{\"order_id\": 1001}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_7cd1e837ca6cfb5ef6d07c41",
+      "content": "{\"ok\": true, \"status\": 200, \"data\": {\"id\": 1001, \"customer\": \"Alice\", \"status\": \"shipped\", \"total\": \"59.90\", \"currency\": \"EUR\"}}"
+    }
+  ],
+  "tools": "[3 tools, same as round 0]",
+  "tool_choice": "auto"
+}
+--- round 1: response from model ---
+{
+  "id": "chatcmpl-stub-4e71af4879e4",
+  "object": "chat.completion",
+  "created": 1791142514,
+  "model": "stub-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Order 1001 is shipped (total 59.90 EUR)."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+[answer] Order 1001 is shipped (total 59.90 EUR).
+
+$ python agent.py What is the status of order 9999?
+[tool] get_order {"order_id": 9999}
+[result] {"ok": false, "error": "not_found", "message": "Order 9999 does not exist.", "retryable": false, "status": 404, "hint": "Check the ID with the user. Do not guess another ID."}
+[answer] I could not find order 9999. Please check the order number.
+
+$ python agent.py Show me order twelve
+[tool] get_order {"order_id": "twelve"}
+[result] {"ok": false, "error": "invalid_arguments", "message": "'twelve' is not of type 'integer'", "retryable": false, "hint": "Ask the user for a valid value. Do not invent one."}
+[answer] I need the numeric order ID, for example 1001.
+
+$ python agent.py --trace Where are the parcels for orders 1001, 1002 and 1003?
+--- round 0: request to model ---
+{
+  "model": "stub-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an order support helper. Use the tools to look up real data. Never guess order data. If a tool returns an error, explain it to the user."
+    },
+    {
+      "role": "user",
+      "content": "Where are the parcels for orders 1001, 1002 and 1003?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_order",
+        "description": "Get one order by its numeric ID. Returns status, customer, total and currency.",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Numeric order ID, for example 1001"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_shipment",
+        "description": "Get the carrier, tracking number and estimated delivery date of one order.",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Numeric order ID"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "cancel_order",
+        "description": "Cancel an order that has not shipped yet. Ask the user before calling this tool.",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "order_id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Numeric order ID"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Short reason given by the customer"
+            }
+          },
+          "required": [
+            "order_id",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto"
+}
+--- round 0: response from model ---
+{
+  "id": "chatcmpl-stub-c74f9ff833e7",
+  "object": "chat.completion",
+  "created": 1791142516,
+  "model": "stub-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_110a99c9304f1a6bd9d10e03",
+            "type": "function",
+            "function": {
+              "name": "get_shipment",
+              "arguments": "{\"order_id\": 1001}"
+            }
+          },
+          {
+            "id": "call_ee7b4387121820208b2bde68",
+            "type": "function",
+            "function": {
+              "name": "get_shipment",
+              "arguments": "{\"order_id\": 1002}"
+            }
+          },
+          {
+            "id": "call_8f228cea2fc49ff48ada07c4",
+            "type": "function",
+            "function": {
+              "name": "get_shipment",
+              "arguments": "{\"order_id\": 1003}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ]
+}
+[tool] get_shipment {"order_id": 1001}
+[result] {"ok": true, "status": 200, "data": {"order_id": 1001, "carrier": "DHL", "tracking_number": "JD014600006281", "eta": "2026-10-07"}}
+[tool] get_shipment {"order_id": 1002}
+[result] {"ok": true, "status": 200, "data": {"order_id": 1002, "carrier": null, "tracking_number": null, "eta": null}}
+[tool] get_shipment {"order_id": 1003}
+[result] {"ok": false, "error": "rate_limited", "message": "Shipment lookups are limited to 2 per 30 seconds.", "retryable": true, "status": 429, "retry_after_seconds": 30, "hint": "Tell the user to try again later. Do not call this tool again in this turn."}
+--- round 1: request to model ---
+{
+  "model": "stub-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an order support helper. Use the tools to look up real data. Never guess order data. If a tool returns an error, explain it to the user."
+    },
+    {
+      "role": "user",
+      "content": "Where are the parcels for orders 1001, 1002 and 1003?"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_110a99c9304f1a6bd9d10e03",
+          "type": "function",
+          "function": {
+            "name": "get_shipment",
+            "arguments": "{\"order_id\": 1001}"
+          }
+        },
+        {
+          "id": "call_ee7b4387121820208b2bde68",
+          "type": "function",
+          "function": {
+            "name": "get_shipment",
+            "arguments": "{\"order_id\": 1002}"
+          }
+        },
+        {
+          "id": "call_8f228cea2fc49ff48ada07c4",
+          "type": "function",
+          "function": {
+            "name": "get_shipment",
+            "arguments": "{\"order_id\": 1003}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_110a99c9304f1a6bd9d10e03",
+      "content": "{\"ok\": true, \"status\": 200, \"data\": {\"order_id\": 1001, \"carrier\": \"DHL\", \"tracking_number\": \"JD014600006281\", \"eta\": \"2026-10-07\"}}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_ee7b4387121820208b2bde68",
+      "content": "{\"ok\": true, \"status\": 200, \"data\": {\"order_id\": 1002, \"carrier\": null, \"tracking_number\": null, \"eta\": null}}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_8f228cea2fc49ff48ada07c4",
+      "content": "{\"ok\": false, \"error\": \"rate_limited\", \"message\": \"Shipment lookups are limited to 2 per 30 seconds.\", \"retryable\": true, \"status\": 429, \"retry_after_seconds\": 30, \"hint\": \"Tell the user to try again later. Do not call this tool again in this turn.\"}"
+    }
+  ],
+  "tools": "[3 tools, same as round 0]",
+  "tool_choice": "auto"
+}
+--- round 1: response from model ---
+{
+  "id": "chatcmpl-stub-bcd830cc55d1",
+  "object": "chat.completion",
+  "created": 1791142516,
+  "model": "stub-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Order 1001 ships with DHL, tracking JD014600006281, expected 2026-10-07. Order 1002 has not shipped yet. I could not get the shipment for order 1003 right now; please try again in about 30 seconds."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+[answer] Order 1001 ships with DHL, tracking JD014600006281, expected 2026-10-07. Order 1002 has not shipped yet. I could not get the shipment for order 1003 right now; please try again in about 30 seconds.
+
+$ curl -s -i http://127.0.0.1:8780/orders/1003/shipment
+HTTP/1.1 429 Too Many Requests
+date: Sun, 04 Oct 2026 19:35:16 GMT
+server: uvicorn
+retry-after: 30
+content-length: 124
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"Shipment lookups are limited to 2 per 30 seconds."}
+$ echo y | python agent.py "Cancel order 1002, wrong size"
+[tool] cancel_order {"order_id": 1002, "reason": "Customer ordered the wrong size"}
+Confirm cancel_order {"order_id": 1002, "reason": "Customer ordered the wrong size"}? [y/N] y
+[result] {"ok": true, "status": 200, "data": {"id": 1002, "status": "cancelled", "reason": "Customer ordered the wrong size"}}
+[answer] Order 1002 is cancelled.
+
+$ echo n | python agent.py "Cancel order 1001, wrong size"
+[tool] cancel_order {"order_id": 1001, "reason": "Customer ordered the wrong size"}
+Confirm cancel_order {"order_id": 1001, "reason": "Customer ordered the wrong size"}? [y/N] n
+[result] {"ok": false, "error": "declined_by_user", "message": "The user did not confirm this action.", "retryable": false}
+[answer] OK, I did not cancel order 1001.
+
+$ echo y | python agent.py "Cancel order 1001, wrong size"
+[tool] cancel_order {"order_id": 1001, "reason": "Customer ordered the wrong size"}
+Confirm cancel_order {"order_id": 1001, "reason": "Customer ordered the wrong size"}? [y/N] y
+[result] {"ok": false, "error": "conflict", "message": "Order 1001 is shipped and can no longer be cancelled.", "retryable": false, "status": 409, "hint": "Explain the current state to the user. Do not retry."}
+[answer] Order 1001 is shipped and can no longer be cancelled.
+
+$ echo y | python agent.py "Cancel order 1005, wrong size"
+[tool] cancel_order {"order_id": 1005, "reason": "Customer ordered the wrong size"}
+Confirm cancel_order {"order_id": 1005, "reason": "Customer ordered the wrong size"}? [y/N] y
+[retry] cancel_order timed out, sending it again with the same headers
+[result] {"ok": true, "status": 200, "data": {"id": 1005, "status": "cancelled", "reason": "Customer ordered the wrong size"}, "replayed": true}
+[answer] Order 1005 is cancelled.
+
+$ curl -s -i -X POST http://127.0.0.1:8780/orders/1004/cancel -H Content-Type: application/json -H Idempotency-Key: 7d4c1f0e-2b8a-4c55-9a51-0f3e6b2d9c11 -d {"reason": "Duplicate order"}
+HTTP/1.1 200 OK
+date: Sun, 04 Oct 2026 19:35:22 GMT
+server: uvicorn
+content-length: 59
+content-type: application/json
+
+{"id":1004,"status":"cancelled","reason":"Duplicate order"}
+$ curl -s -i -X POST http://127.0.0.1:8780/orders/1004/cancel -H Content-Type: application/json -H Idempotency-Key: 7d4c1f0e-2b8a-4c55-9a51-0f3e6b2d9c11 -d {"reason": "Duplicate order"}
+HTTP/1.1 200 OK
+date: Sun, 04 Oct 2026 19:35:22 GMT
+server: uvicorn
+idempotent-replayed: true
+content-length: 59
+content-type: application/json
+
+{"id":1004,"status":"cancelled","reason":"Duplicate order"}
+$ python openapi_tools.py cancelOrder
+openapi: 3.1.0
+http: {"method": "POST", "path": "/orders/{order_id}/cancel"}
+{
+  "type": "function",
+  "function": {
+    "name": "cancelOrder",
+    "description": "Cancel an order that has not shipped yet",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why the customer wants to cancel"
+        }
+      },
+      "required": [
+        "order_id",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
+

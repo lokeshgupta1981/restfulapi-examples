@@ -1,0 +1,149 @@
+# Real run, 2026-10-04T19:32Z, clean venv, Python 3.13.16
+
+$ pip freeze (selected)
+fastapi==0.142.2
+fastmcp==4.0.11
+httpx2==2.13.1
+mcp==2.3.0
+mcp-types==2.3.0
+pydantic==2.13.5
+PyYAML==6.0.3
+tiktoken==0.14.0
+uvicorn==0.54.0
+
+$ curl -s -H "Authorization: Bearer dev-token-123" "http://127.0.0.1:8080/tickets?status=open&limit=2"
+{"items":[{"id":"T-1023","subject":"Dashboard is slow in the morning","description":"Customer report for dashboard is slow in the morning.","status":"open","priority":"high","assignee":"A-2","customer_id":"C-203","tags":[],"created_at":"2026-09-23T10:00:00Z","updated_at":"2026-09-23T13:00:00Z"},{"id":"T-1021","subject":"SSO login loops back to start","description":"Customer report for sso login loops back to start.","status":"open","priority":"high","assignee":null,"customer_id":"C-201","tags":[],"created_at":"2026-09-21T08:00:00Z","updated_at":"2026-09-21T11:00:00Z"}],"next_cursor":"Mg=="}
+
+$ curl -s "http://127.0.0.1:8080/tickets"
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Send Authorization: Bearer <token>."}
+
+$ python compare_tools.py
+== generated: 11 tools, 8,476 bytes, 2,083 tokens
+   listTickets             1359 bytes   335 tokens  hints: none
+   createTicket            1029 bytes   253 tokens  hints: none
+   getTicket                858 bytes   214 tokens  hints: none
+   deleteTicket             319 bytes    78 tokens  hints: none
+   updateTicket            1099 bytes   270 tokens  hints: none
+   listComments             752 bytes   183 tokens  hints: none
+   addComment              1245 bytes   298 tokens  hints: none
+   getCustomer              503 bytes   125 tokens  hints: none
+   listAgents               452 bytes   113 tokens  hints: none
+   purgeClosedTickets       392 bytes    94 tokens  hints: none
+   getAuditLog              468 bytes   120 tokens  hints: none
+== filtered: 8 tools, 7,301 bytes, 1,792 tokens
+   list_tickets            1361 bytes   336 tokens  hints: none
+   createTicket            1029 bytes   253 tokens  hints: none
+   get_ticket               860 bytes   214 tokens  hints: none
+   updateTicket            1099 bytes   270 tokens  hints: none
+   listComments             752 bytes   183 tokens  hints: none
+   addComment              1245 bytes   298 tokens  hints: none
+   getCustomer              503 bytes   125 tokens  hints: none
+   listAgents               452 bytes   113 tokens  hints: none
+== curated: 6 tools, 5,376 bytes, 1,296 tokens
+   find_tickets            1346 bytes   333 tokens  hints: readOnly
+   get_ticket_overview     1096 bytes   262 tokens  hints: readOnly
+   reply_to_customer        818 bytes   193 tokens  hints: openWorld
+   close_ticket             910 bytes   207 tokens  hints: destructive
+   get_customer             607 bytes   148 tokens  hints: readOnly
+   list_agents              599 bytes   153 tokens  hints: readOnly
+
+$ python call_tools.py
+== generated server
+> listTickets {"status": "open"}
+  10 tickets, next_cursor=MTA=
+> addComment {"ticket_id": "T-1003"}
+  is_error=True
+  Error calling tool 'addComment': HTTP error 422: Unprocessable Content - {'type': 'about:blank', 'title': 'Unprocessable Content', 'status': 422, 'detail': 'Send kind (public_reply or internal_note) and a non-empty body.'}
+> deleteTicket {"ticket_id": "T-1024"}
+  is_error=False
+  (empty result)
+> getTicket {"ticket_id": "T-1024"}
+  is_error=True
+  Error calling tool 'getTicket': HTTP error 404: Not Found - {'type': 'about:blank', 'title': 'Not Found', 'status': 404, 'detail': 'Ticket T-1024 does not exist.'}
+== curated server
+> find_tickets {"status": "open"}
+  12 tickets, more_available=False
+> get_ticket_overview {"ticket_id": "T-1005"}
+  is_error=False
+  {"ticket":{"id":"T-1005","subject":"Webhook calls stopped","status":"open","priority":"normal","assignee":null,"customer_id":"C-201"},"customer_name":"Northwind Traders","customer_plan":"enterprise","comments":[{"kind":"customer_message","author":"C-201","created_at":"2026-09-05T12:00:00Z","body":"C
+> reply_to_customer {"ticket_id": "T-1003", "message": "We corrected the VAT number on your invoice."}
+  is_error=False
+  {"id":"T-1003","subject":"Export to CSV times out","status":"pending","priority":"low","assignee":"A-3","customer_id":"C-203"}
+> close_ticket {"ticket_id": "T-1005", "resolution": "Webhook URL fixed", "confirmation": "123456abcdef"}
+  is_error=True
+  Wrong confirmation code. Call close_ticket without a confirmation first.
+> close_ticket {"ticket_id": "T-1005", "resolution": "Webhook URL fixed"}
+  {"status": "needs_confirmation", "message": "T-1005 'Webhook calls stopped' (open, normal) will be closed with the note: Webhook URL fixed. Ask the user to confirm.", "confirmation": "6231d0fbb275"}
+> close_ticket {"ticket_id": "T-1005", "resolution": "Webhook URL fixed", "confirmation": "6231d0fbb275"}
+  is_error=False
+  {"status":"closed","message":"T-1005 is closed.","confirmation":null}
+> deleteTicket {"ticket_id": "T-1023"}
+  is_error=True
+  Unknown tool: 'deleteTicket'
+
+# API log
+INFO:     Started server process [16069]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8080 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54722 - "GET /tickets?status=open&limit=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54728 - "GET /tickets HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:47236 - "GET /tickets?status=open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47236 - "POST /tickets/T-1003/comments HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:47236 - "DELETE /tickets/T-1024 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:47236 - "GET /tickets/T-1024 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:47240 - "GET /tickets?status=open HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /tickets?status=open&cursor=MTA%3D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /tickets/T-1005 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /customers/C-201 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /tickets/T-1005/comments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "POST /tickets/T-1003/comments HTTP/1.1" 201 Created
+INFO:     127.0.0.1:47240 - "PATCH /tickets/T-1003 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /tickets/T-1005 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /tickets/T-1005 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "GET /tickets/T-1005 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47240 - "POST /tickets/T-1005/comments HTTP/1.1" 201 Created
+INFO:     127.0.0.1:47240 - "PATCH /tickets/T-1005 HTTP/1.1" 200 OK
+
+# Scratch run: curated server over Streamable HTTP (python curated_server.py http)
+protocol: 2026-07-28
+tools: ['find_tickets', 'get_ticket_overview', 'reply_to_customer', 'close_ticket', 'get_customer', 'list_agents']
+
+# Scratch run: from_openapi without a client (base URL from servers[0].url, no Authorization header)
+is_error = True
+Error calling tool 'getTicket': HTTP error 401: Unauthorized - {'type': 'about:blank', 'title': 'Unauthorized', 'status': 401, 'detail': 'Send Authorization: Bearer <token>.'}
+
+# Scratch run: StdioTransport without env= (the token is set in the parent shell; the mcp SDK passes only PATH, HOME and a few other variables)
+KeyError: 'HELPDESK_API_TOKEN'
+
+# Second generator: openapi-mcp-generator 4.1.0 (Node v22.22.0)
+$ npx openapi-mcp-generator@4.1.0 --input openapi.yaml --output helpdesk-mcp
+---
+MCP server project 'helpdesk-api' successfully generated at: helpdesk-mcp
+Next steps:
+1. Navigate to the directory: cd helpdesk-mcp
+2. Install dependencies: npm install
+3. Build the TypeScript code: npm run build
+4. Run the server: npm start
+   (This runs the built JavaScript code in build/index.js)
+---
+$ cd helpdesk-mcp && npm install && npm run build
+> tsc && shx chmod 755 build/index.js
+
+$ npm ls @modelcontextprotocol/sdk
+
+$ python check_ts_server.py helpdesk-mcp/build/index.js
+protocol: 2025-11-25
+11 tools, 3,940 bytes, 938 tokens
+names: ['listTickets', 'createTicket', 'getTicket', 'deleteTicket', 'updateTicket', 'listComments', 'addComment', 'getCustomer', 'listAgents', 'purgeClosedTickets', 'getAuditLog']
+> addComment {"ticket_id": "T-1003"}
+  is_error=False
+  Invalid arguments for tool 'addComment': requestBody (invalid_type): Required
+> addComment {"ticket_id": "T-1003", "requestBody": {"kind": "internal_note", "body": "Checked the VAT number"}}
+  is_error=False
+  API Response (Status: 201): {   "id": "T-1003-c3",   "ticket_id": "T-1003",   "kind": "internal_note",   "body": "Checked the VAT number",   "author": "A-2",   
+
+$ npm ls @modelcontextprotocol/sdk  (run again inside helpdesk-mcp)
+
+
+`-- @modelcontextprotocol/sdk@1.32.0

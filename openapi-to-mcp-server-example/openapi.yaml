@@ -1,0 +1,447 @@
+openapi: 3.1.0
+info:
+  title: Helpdesk API
+  version: 1.0.0
+  description: A small support ticket API with tickets, comments, customers and agents.
+servers:
+  - url: http://127.0.0.1:8080
+security:
+  - bearerAuth: []
+tags:
+  - name: tickets
+  - name: comments
+  - name: customers
+  - name: admin
+    description: Operations for the support team leads only.
+
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      description: Returns one page of tickets, newest first. Use next_cursor to get the next page.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TicketStatus'
+        - name: priority
+          in: query
+          schema:
+            $ref: '#/components/schemas/Priority'
+        - name: assignee
+          in: query
+          description: Agent id, for example A-1.
+          schema:
+            type: string
+        - name: customer_id
+          in: query
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          description: Opaque cursor from the previous page.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: One page of tickets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create a ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewTicket'
+      responses:
+        '201':
+          description: The new ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tickets/{ticket_id}:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    get:
+      operationId: getTicket
+      tags: [tickets]
+      summary: Get a ticket
+      responses:
+        '200':
+          description: The ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateTicket
+      tags: [tickets]
+      summary: Update a ticket
+      description: Changes status, priority or assignee. Fields that are left out stay unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketPatch'
+      responses:
+        '200':
+          description: The updated ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteTicket
+      tags: [tickets]
+      summary: Delete a ticket
+      description: Deletes the ticket and all of its comments. This cannot be undone.
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tickets/{ticket_id}/comments:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    get:
+      operationId: listComments
+      tags: [comments]
+      summary: List comments on a ticket
+      responses:
+        '200':
+          description: All comments, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: addComment
+      tags: [comments]
+      summary: Add a comment
+      description: Adds either a public reply (emailed to the customer) or an internal note (visible to agents only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PublicReply'
+                - $ref: '#/components/schemas/InternalNote'
+              discriminator:
+                propertyName: kind
+                mapping:
+                  public_reply: '#/components/schemas/PublicReply'
+                  internal_note: '#/components/schemas/InternalNote'
+      responses:
+        '201':
+          description: The new comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers/{customer_id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get a customer
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-mcp-tool:
+        name: get_customer
+        description: Get a customer's name, plan and contact email by customer id, for example C-201.
+
+  /agents:
+    get:
+      operationId: listAgents
+      tags: [tickets]
+      summary: List support agents
+      responses:
+        '200':
+          description: All agents.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+      x-mcp-tool:
+        name: list_agents
+        description: List the support agents with their ids (A-1, A-2, ...), names and teams. Use an agent id as the assignee filter in find_tickets.
+
+  /admin/tickets/purge:
+    post:
+      operationId: purgeClosedTickets
+      tags: [admin]
+      summary: Purge closed tickets
+      description: Permanently deletes every closed ticket older than the given number of days.
+      parameters:
+        - name: older_than_days
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 30
+      responses:
+        '200':
+          description: How many tickets were deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+
+  /admin/audit-log:
+    get:
+      operationId: getAuditLog
+      tags: [admin]
+      summary: Get the audit log
+      responses:
+        '200':
+          description: Every write request with the caller and time.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEntry'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  parameters:
+    TicketId:
+      name: ticket_id
+      in: path
+      required: true
+      description: Ticket id, for example T-1004.
+      schema:
+        type: string
+
+  responses:
+    NotFound:
+      description: The ticket or customer does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Missing or wrong bearer token.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    TicketStatus:
+      type: string
+      enum: [open, pending, closed]
+    Priority:
+      type: string
+      enum: [low, normal, high, urgent]
+    Ticket:
+      type: object
+      required: [id, subject, status, priority, customer_id, created_at]
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        priority:
+          $ref: '#/components/schemas/Priority'
+        assignee:
+          type: [string, 'null']
+        customer_id:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TicketPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ticket'
+        next_cursor:
+          type: [string, 'null']
+    NewTicket:
+      type: object
+      required: [subject, customer_id]
+      properties:
+        subject:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        customer_id:
+          type: string
+        priority:
+          $ref: '#/components/schemas/Priority'
+        tags:
+          type: array
+          items:
+            type: string
+    TicketPatch:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        priority:
+          $ref: '#/components/schemas/Priority'
+        assignee:
+          type: [string, 'null']
+    PublicReply:
+      type: object
+      required: [kind, body]
+      properties:
+        kind:
+          type: string
+          const: public_reply
+        body:
+          type: string
+        notify_customer:
+          type: boolean
+          default: true
+    InternalNote:
+      type: object
+      required: [kind, body]
+      properties:
+        kind:
+          type: string
+          const: internal_note
+        body:
+          type: string
+        mention:
+          type: array
+          items:
+            type: string
+          description: Agent ids to notify.
+    Comment:
+      type: object
+      required: [id, ticket_id, kind, body, author, created_at]
+      properties:
+        id:
+          type: string
+        ticket_id:
+          type: string
+        kind:
+          type: string
+          enum: [public_reply, internal_note, customer_message]
+        body:
+          type: string
+        author:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Customer:
+      type: object
+      required: [id, name, email, plan]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        plan:
+          type: string
+          enum: [free, pro, enterprise]
+    Agent:
+      type: object
+      required: [id, name, team]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        team:
+          type: string
+    AuditEntry:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+        method:
+          type: string
+        path:
+          type: string
+        caller:
+          type: string
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
