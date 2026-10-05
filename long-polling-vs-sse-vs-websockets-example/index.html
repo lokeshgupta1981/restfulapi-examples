@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Order 1042: three ways to get updates</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  pre { background: #f4f4f4; padding: .5rem; min-height: 12rem; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Order 1042</h1>
+<p>
+  <button id="publish">Publish "shipped"</button>
+  <button id="cancel">Cancel over WebSocket</button>
+</p>
+<div class="cols">
+  <div><h2>Long polling</h2><pre id="lp"></pre></div>
+  <div><h2>SSE</h2><pre id="sse"></pre></div>
+  <div><h2>WebSocket</h2><pre id="ws"></pre></div>
+</div>
+<script>
+const orderUrl = "/orders/1042";
+const show = (id, text) => { document.getElementById(id).textContent += text + "\n"; };
+
+// 1. Long polling: one request at a time, the cursor "after" says what we already have.
+async function longPoll() {
+  let lastId = 0;
+  while (true) {
+    try {
+      const response = await fetch(orderUrl + "/updates?after=" + lastId);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const body = await response.json();
+      body.events.forEach(e => show("lp", "#" + e.id + " " + e.status));
+      lastId = body.last_id;
+    } catch (error) {
+      show("lp", "error: " + error.message + ", retry in 3 s");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
+
+// 2. Server-sent events: the browser reconnects and sends Last-Event-ID for us.
+let sseLastId = 0;
+function openStream() {
+  const source = new EventSource(orderUrl + "/stream?after=" + sseLastId);
+  source.addEventListener("status", e => {
+    sseLastId = Number(e.lastEventId);
+    show("sse", "#" + e.lastEventId + " " + JSON.parse(e.data).status);
+  });
+  source.onerror = () => {
+    show("sse", "connection lost, readyState=" + source.readyState);
+    if (source.readyState === EventSource.CLOSED) {
+      // The browser gave up (non-200 status or wrong Content-Type), so we start a new stream.
+      setTimeout(openStream, 5000);
+    }
+  };
+}
+
+// 3. WebSocket: we reconnect ourselves and pass the last id we saw.
+let socket;
+let wsLastId = 0;
+function connectSocket(delayMs = 1000) {
+  const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+  socket = new WebSocket(scheme + location.host + orderUrl + "/socket?after=" + wsLastId);
+  socket.onmessage = e => {
+    const event = JSON.parse(e.data);
+    wsLastId = event.id;
+    show("ws", "#" + event.id + " " + event.status);
+  };
+  socket.onclose = e => {
+    show("ws", "closed with code " + e.code + ", reconnect in " + delayMs + " ms");
+    setTimeout(() => connectSocket(Math.min(delayMs * 2, 30000)), delayMs);
+  };
+  socket.onopen = () => { delayMs = 1000; };
+}
+
+document.getElementById("publish").onclick = () =>
+  fetch(orderUrl + "/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "shipped" }),
+  });
+document.getElementById("cancel").onclick = () => socket.send(JSON.stringify({ action: "cancel" }));
+
+longPoll();
+openStream();
+connectSocket();
+</script>
+</body>
+</html>

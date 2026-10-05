@@ -1,0 +1,11 @@
+type: object
+required: [eventId, occurredAt, order]
+properties:
+  eventId:
+    type: string
+    format: uuid
+  occurredAt:
+    type: string
+    format: date-time
+  order:
+    $ref: "./order.yaml"

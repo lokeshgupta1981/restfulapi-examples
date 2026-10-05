@@ -1,0 +1,263 @@
+### python3 server.py
+Listening on http://127.0.0.1:9160
+
+### python encode.py (requests 2.34.2)
+quote(v):
+  'C++ & Java/Go'    -> C%2B%2B%20%26%20Java/Go
+  'café'             -> caf%C3%A9
+  '50% off'          -> 50%25%20off
+  '~user*(1)!'       -> ~user%2A%281%29%21
+quote(v, safe=''):
+  'C++ & Java/Go'    -> C%2B%2B%20%26%20Java%2FGo
+  'café'             -> caf%C3%A9
+  '50% off'          -> 50%25%20off
+  '~user*(1)!'       -> ~user%2A%281%29%21
+quote_plus(v):
+  'C++ & Java/Go'    -> C%2B%2B+%26+Java%2FGo
+  'café'             -> caf%C3%A9
+  '50% off'          -> 50%25+off
+  '~user*(1)!'       -> ~user%2A%281%29%21
+urlencode({'q': v}):
+  'C++ & Java/Go'    -> q=C%2B%2B+%26+Java%2FGo
+  'café'             -> q=caf%C3%A9
+  '50% off'          -> q=50%25+off
+  '~user*(1)!'       -> q=~user%2A%281%29%21
+
+requests with params=
+  sent:     /v2/docs/report?tag=C%2B%2B+%26+Java%2FGo
+  received: {'tag': ['C++ & Java/Go']}
+requests with a hand-built URL (no encoding):
+  sent:     /v2/docs/report?tag=C++%20&%20Java/Go
+  received: {'tag': ['C   '], ' Java/Go': ['']}
+requests with a path segment from quote(safe=''):
+  sent:     /v2/docs/AB%2F12%20caf%C3%A9
+  received: AB/12 café
+
+double encoding:
+  encoded once:  caf%C3%A9
+  encoded twice: caf%25C3%25A9
+  server name:   caf%C3%A9
+  unquote(unquote(twice)): café
+
+### node encode.mjs (v22.22.0)
+encodeURIComponent(v):
+  "C++ & Java/Go"    -> C%2B%2B%20%26%20Java%2FGo
+  "café"             -> caf%C3%A9
+  "50% off"          -> 50%25%20off
+  "~user*(1)!"       -> ~user*(1)!
+encodeURI(v):
+  "C++ & Java/Go"    -> C++%20&%20Java/Go
+  "café"             -> caf%C3%A9
+  "50% off"          -> 50%25%20off
+  "~user*(1)!"       -> ~user*(1)!
+URLSearchParams({ q: v }):
+  "C++ & Java/Go"    -> q=C%2B%2B+%26+Java%2FGo
+  "café"             -> q=caf%C3%A9
+  "50% off"          -> q=50%25+off
+  "~user*(1)!"       -> q=%7Euser*%281%29%21
+
+URL object, searchParams.set():
+  href: http://127.0.0.1:9160/v2/docs/report?tag=C%2B%2B+%26+Java%2FGo
+  received: {"tag":["C++ & Java/Go"]}
+URL object, pathname with a slash in the value:
+  href: http://127.0.0.1:9160/v2/docs/AB/12%20caf%C3%A9
+  status: 404
+Path segment from encodeURIComponent():
+  url: http://127.0.0.1:9160/v2/docs/AB%2F12%20caf%C3%A9
+  received: AB/12 café
+
+decodeURIComponent('50%zz') throws URIError: URI malformed
+
+### java -Dstdout.encoding=UTF-8 Encode.java (JDK 21)
+URLEncoder.encode(v, UTF_8):
+  "C++ & Java/Go"    -> C%2B%2B+%26+Java%2FGo
+  "café"             -> caf%C3%A9
+  "50% off"          -> 50%25+off
+  "~user*(1)!"       -> %7Euser*%281%29%21
+URLEncoder output used in a path (+ replaced with %20):
+  AB%2F12%20caf%C3%A9
+new URI(scheme, authority, path, query, fragment):
+  http://127.0.0.1:9160/v2/docs/report?tag=C++%20&%20Java/Go
+  server got: {"raw_target": "/v2/docs/report?tag=C++%20&%20Java/Go","name": "report","query": {"tag": ["C   "]," Java/Go": [""]}}
+Encoded each value first:
+  /v2/docs/AB%2F12%20caf%C3%A9?tag=C%2B%2B+%26+Java%2FGo
+  server got: {"raw_target": "/v2/docs/AB%2F12%20caf%C3%A9?tag=C%2B%2B+%26+Java%2FGo","name": "AB/12 café","query": {"tag": ["C++ & Java/Go"]}}
+URLDecoder.decode("a+b%2Bc", UTF_8): a b+c
+
+### java -Dstdout.encoding=UTF-8 UrlBuilding.java (JDK 21)
+/v2/docs/report?tag=C++%20&%20Java/Go
+  {"raw_target": "/v2/docs/report?tag=C++%20&%20Java/Go","name": "report","query": {"tag": ["C   "]," Java/Go": [""]}}
+/v2/docs/AB%2F12%20caf%C3%A9?tag=C%2B%2B+%26+Java%2FGo
+  {"raw_target": "/v2/docs/AB%2F12%20caf%C3%A9?tag=C%2B%2B+%26+Java%2FGo","name": "AB/12 café","query": {"tag": ["C++ & Java/Go"]}}
+
+### bash demo.sh (curl 8.5.0)
+$ curl -s -G http://127.0.0.1:9160/v2/docs/report --data-urlencode tag=C++ & Java/Go
+{
+  "raw_target": "/v2/docs/report?tag=C%2b%2b+%26+Java%2fGo",
+  "name": "report",
+  "query": {
+    "tag": [
+      "C++ & Java/Go"
+    ]
+  }
+}
+
+$ curl -s http://127.0.0.1:9160/v2/docs/report --url-query tag=C++ & Java/Go
+{
+  "raw_target": "/v2/docs/report?tag=C%2b%2b+%26+Java%2fGo",
+  "name": "report",
+  "query": {
+    "tag": [
+      "C++ & Java/Go"
+    ]
+  }
+}
+
+$ curl -s http://127.0.0.1:9160/v2/docs/report?tag=C++%20%26%20Java
+{
+  "raw_target": "/v2/docs/report?tag=C++%20%26%20Java",
+  "name": "report",
+  "query": {
+    "tag": [
+      "C   & Java"
+    ]
+  }
+}
+
+$ curl -s http://127.0.0.1:9160/v2/docs/AB%2F12
+{
+  "raw_target": "/v2/docs/AB%2F12",
+  "name": "AB/12",
+  "query": {}
+}
+
+$ curl -s http://127.0.0.1:9160/v2/docs/a+b?tag=a+b&tag=a%2Bb
+{
+  "raw_target": "/v2/docs/a+b?tag=a+b&tag=a%2Bb",
+  "name": "a+b",
+  "query": {
+    "tag": [
+      "a b",
+      "a+b"
+    ]
+  }
+}
+
+$ curl -s http://127.0.0.1:9160/v2/docs/caf%C3%A9?tag=50%25%20off
+{
+  "raw_target": "/v2/docs/caf%C3%A9?tag=50%25%20off",
+  "name": "café",
+  "query": {
+    "tag": [
+      "50% off"
+    ]
+  }
+}
+
+$ curl -s -i http://127.0.0.1:9160/v2/docs/50%zz
+HTTP/1.1 400 Bad Request
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 111
+
+{
+  "error": "bad percent-encoding",
+  "detail": "malformed percent-escape",
+  "raw_target": "/v2/docs/50%zz"
+}
+
+$ curl -s -i http://127.0.0.1:9160/v2/docs/caf%E9
+HTTP/1.1 400 Bad Request
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 162
+
+{
+  "error": "bad percent-encoding",
+  "detail": "'utf-8' codec can't decode byte 0xe9 in position 3: unexpected end of data",
+  "raw_target": "/v2/docs/caf%E9"
+}
+
+$ curl -s -i http://127.0.0.1:9160/v2/docs/report?tag=50%zz
+HTTP/1.1 400 Bad Request
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 131
+
+{
+  "error": "bad percent-encoding",
+  "detail": "malformed percent-escape in query",
+  "raw_target": "/v2/docs/report?tag=50%zz"
+}
+
+$ curl -s http://127.0.0.1:9160/v2/docs/100%2541
+{
+  "raw_target": "/v2/docs/100%2541",
+  "name": "100%41",
+  "query": {}
+}
+
+$ curl -s http://127.0.0.1:9160/v1/docs/100%2541
+{
+  "raw_target": "/v1/docs/100%2541",
+  "name": "100A",
+  "query": {}
+}
+
+$ curl -s -i http://127.0.0.1:9160/v2/admin/stats
+HTTP/1.1 403 Forbidden
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 38
+
+{
+  "error": "admin area is blocked"
+}
+
+$ curl -s -i http://127.0.0.1:9160/v2/%2561dmin/stats
+HTTP/1.1 404 Not Found
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 84
+
+{
+  "error": "not found",
+  "segments": [
+    "v2",
+    "%61dmin",
+    "stats"
+  ]
+}
+
+$ curl -s -i http://127.0.0.1:9160/v1/%2561dmin/stats
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 34
+
+{
+  "admin": true,
+  "users": 42
+}
+
+$ curl -s -i http://127.0.0.1:9160/v2/notes --data-urlencode title=Q3 plan --data-urlencode body=a+b=c & 100%
+HTTP/1.1 201 Created
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:19:08 GMT
+Content-Type: application/json; charset=utf-8
+Content-Length: 129
+
+{
+  "raw_body": "title=Q3+plan&body=a%2Bb%3Dc+%26+100%25",
+  "fields": {
+    "title": "Q3 plan",
+    "body": "a+b=c & 100%"
+  }
+}
+

@@ -1,0 +1,158 @@
+# Captured 2026-10-05T03:53:07Z on a clean venv
+## python --version
+Python 3.13.16
+## pip install -r requirements.txt
+fastapi==0.142.2
+httpx2==2.13.1
+pydantic==2.13.5
+pytest==9.1.1
+starlette==1.7.0
+uvicorn==0.54.0
+
+## ./demo.sh
+### 1. No credentials
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="projects-api"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"No credentials"}
+
+
+### 2. Basic credentials instead of a bearer token
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="projects-api"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Use the Bearer scheme"}
+
+
+### 3. Malformed Authorization header
+HTTP/1.1 400 Bad Request
+www-authenticate: Bearer realm="projects-api", error="invalid_request"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"Malformed Authorization header"}
+
+
+### 4. Unknown token
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="projects-api", error="invalid_token", error_description="Unknown access token"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Unknown access token"}
+
+
+### 5. Expired token
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="projects-api", error="invalid_token", error_description="The access token expired"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"The access token expired"}
+
+
+### 6. Suspended account
+HTTP/1.1 403 Forbidden
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"Account suspended"}
+
+
+### 7. Alice reads her tenant's project
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":"p-100","tenant":"acme","owner":"alice","private":false,"name":"Website redesign"}
+
+
+### 8. Alice reads a project that does not exist
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Project p-999 not found"}
+
+
+### 9. Alice reads another tenant's project
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Project p-200 not found"}
+
+
+### 10. Carol reads Alice's private project
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Project p-101 not found"}
+
+
+### 11. Carol deletes with a read-only token
+HTTP/1.1 403 Forbidden
+www-authenticate: Bearer realm="projects-api", error="insufficient_scope", scope="projects:write"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"The token lacks the projects:write scope"}
+
+
+### 12. Alice deletes Erin's project
+HTTP/1.1 403 Forbidden
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"Only the owner or an admin can delete this project"}
+
+
+### 13. Alice opens the admin audit log
+HTTP/1.1 403 Forbidden
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"Admin role required"}
+
+
+### 14. Unknown path without credentials
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="projects-api"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"No credentials"}
+
+
+### 15. Unknown path with a valid token
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"No resource at /no-such-path"}
+
+
+### 16. Alice deletes her own project
+HTTP/1.1 204 No Content
+
+
+
+## python client.py (fresh API)
+GET /projects/p-100
+  GET /projects/p-100 -> HTTP 401 (attempt 1)
+  refreshed the access token
+  GET /projects/p-100 -> HTTP 200 (attempt 2)
+  result: ok
+DELETE /projects/p-102
+  DELETE /projects/p-102 -> HTTP 403 (attempt 1)
+  result: show 'no permission': Only the owner or an admin can delete this project
+GET /projects/p-200
+  GET /projects/p-200 -> HTTP 404 (attempt 1)
+  result: show 'not found' and drop the cached item
+
+## pytest -q
+.....                                                                    [100%]
+5 passed in 0.31s
+
+## python matrix.py (status code per caller, TestClient)
+request                   no token | carol (acme, read) | alice (acme, read+write) | bob (globex admin)
+GET /projects/p-100       401      | 200                | 200                      | 404               
+GET /projects/p-101       401      | 404                | 200                      | 404               
+GET /projects/p-999       401      | 404                | 404                      | 404               
+GET /projects/p-200       401      | 404                | 404                      | 200               
+DELETE /projects/p-102    401      | 403                | 403                      | 404               
+GET /admin/audit-log      401      | 403                | 403                      | 200               
+
+## python leaky_lookup.py
+p-999 404 {"type":"about:blank","title":"Not Found","status":404,"detail":"Project p-999 not found"}
+p-200 403 {"type":"about:blank","title":"Forbidden","status":403,"detail":"Not your tenant"}

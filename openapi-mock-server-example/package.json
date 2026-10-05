@@ -1,0 +1,20 @@
+{
+  "name": "openapi-mock-server-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mock:prism": "prism mock openapi.yaml --port 9220",
+    "mock:prism:dynamic": "prism mock openapi.yaml --port 9220 --dynamic --seed orders",
+    "mock:mockoon": "mockoon-cli start --data openapi.yaml --port 9221",
+    "mock:stateful": "node stateful-mock.js",
+    "real-api": "node real-api.js",
+    "proxy": "prism proxy openapi.yaml http://127.0.0.1:9223 --port 9224 --errors",
+    "test:consumer": "node --test consumer.test.js"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "5.16.0",
+    "@mockoon/cli": "9.9.0",
+    "openapi-backend": "5.21.2"
+  }
+}

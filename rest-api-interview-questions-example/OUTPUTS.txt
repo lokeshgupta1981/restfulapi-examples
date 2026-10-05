@@ -1,0 +1,131 @@
+# Run on 2026-10-05 with Python 3.13.16, fastapi==0.142.2 httpx2==2.13.1 pydantic==2.13.5 pytest==9.1.1 starlette==1.7.0 uvicorn==0.54.0 
+# demo.sh against a freshly started uvicorn app:app --port 9230 (requests numbered in article order)
+
+### 1. Unsupported method on the collection (question 1.12)
+$ curl -i -X PUT http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -d '{}'
+HTTP/1.1 405 Method Not Allowed
+allow: GET, POST
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Method Not Allowed","status":405,"detail":"PUT is not supported on /orders."}
+
+
+### 2. POST creates order 1001 (question 2.2)
+$ curl -i -X POST http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -d '{"product":"keyboard","quantity":2}'
+HTTP/1.1 201 Created
+content-type: application/json
+location: /orders/1001
+etag: "4b3954d2450d7a4b"
+
+{"id":1001,"product":"keyboard","quantity":2,"status":"NEW"}
+
+
+### 3. POST creates order 1002, status code only (question 2.3)
+$ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -d '{"product":"cable","quantity":1}'
+201
+
+
+### 4. DELETE order 1002 (question 2.3)
+$ curl -i -X DELETE http://localhost:9230/orders/1002 -H "Authorization: Bearer writer-token"
+HTTP/1.1 204 No Content
+
+
+
+### 5. Same DELETE again (question 2.3)
+$ curl -i -X DELETE http://localhost:9230/orders/1002 -H "Authorization: Bearer writer-token"
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Order 1002 does not exist."}
+
+
+### 6. POST without a token (question 2.5)
+$ curl -i -X POST http://localhost:9230/orders -H "Content-Type: application/json" -d '{"product":"keyboard","quantity":2}'
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="orders"
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Send a bearer token in the Authorization header."}
+
+
+### 7. POST with a read-only token (question 2.5)
+$ curl -i -X POST http://localhost:9230/orders -H "Authorization: Bearer reader-token" -H "Content-Type: application/json" -d '{"product":"keyboard","quantity":2}'
+HTTP/1.1 403 Forbidden
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"The token does not have the scope orders:write."}
+
+
+### 8. POST with quantity 0 (question 2.6)
+$ curl -i -X POST http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -d '{"product":"keyboard","quantity":0}'
+HTTP/1.1 422 Unprocessable Content
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"quantity: Input should be greater than or equal to 1"}
+
+
+### 9. POST with broken JSON (question 2.6)
+$ curl -i -X POST http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -d '{"product": "keyboard",'
+HTTP/1.1 400 Bad Request
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"The request body is not valid JSON."}
+
+
+### 10. Client A revalidates order 1001 (question 3.1)
+$ curl -i http://localhost:9230/orders/1001 -H "Authorization: Bearer reader-token" -H 'If-None-Match: "4b3954d2450d7a4b"'
+HTTP/1.1 304 Not Modified
+etag: "4b3954d2450d7a4b"
+cache-control: private, max-age=0, must-revalidate
+
+
+
+### 11. Client B replaces order 1001 (question 3.2)
+$ curl -i -X PUT http://localhost:9230/orders/1001 -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -d '{"product":"keyboard","quantity":5}'
+HTTP/1.1 200 OK
+etag: "cd107c88c3a1abb5"
+content-type: application/json
+
+{"id":1001,"product":"keyboard","quantity":5,"status":"NEW"}
+
+
+### 12. Client A writes with its old ETag (question 3.2)
+$ curl -i -X PUT http://localhost:9230/orders/1001 -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -H 'If-Match: "4b3954d2450d7a4b"' -d '{"product":"keyboard","quantity":9}'
+HTTP/1.1 412 Precondition Failed
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"The order changed since you read it. GET it again and retry."}
+
+
+### 13. POST with an Idempotency-Key (question 3.3)
+$ curl -i -X POST http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -H "Idempotency-Key: 7f3c9a" -d '{"product":"mouse","quantity":1}'
+HTTP/1.1 201 Created
+content-type: application/json
+location: /orders/1003
+etag: "f83cc532dec4c29c"
+
+{"id":1003,"product":"mouse","quantity":1,"status":"NEW"}
+
+
+### 14. Same POST retried with the same key (question 3.3)
+$ curl -i -X POST http://localhost:9230/orders -H "Authorization: Bearer writer-token" -H "Content-Type: application/json" -H "Idempotency-Key: 7f3c9a" -d '{"product":"mouse","quantity":1}'
+HTTP/1.1 201 Created
+content-type: application/json
+location: /orders/1003
+etag: "f83cc532dec4c29c"
+
+{"id":1003,"product":"mouse","quantity":1,"status":"NEW"}
+
+
+### 15. First page of orders (question 3.4)
+$ curl -i "http://localhost:9230/orders?limit=1" -H "Authorization: Bearer reader-token"
+HTTP/1.1 200 OK
+link: </orders?limit=1&offset=1>; rel="next"
+content-type: application/json
+
+{"items":[{"id":1001,"product":"keyboard","quantity":5,"status":"NEW"}],"total":2}
+
+
+$ pytest -q
+...........                                                              [100%]
+11 passed in 0.36s

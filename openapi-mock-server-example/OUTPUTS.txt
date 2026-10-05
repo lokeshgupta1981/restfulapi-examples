@@ -1,0 +1,293 @@
+
+===== 1. Prism static mock
+$ curl -s http://127.0.0.1:9220/orders/ord_1001
+{"id":"ord_1001","status":"pending","currency":"USD","total":"59.90","items":[{"sku":"BOOK-REST-101","quantity":2}]}
+$ curl -s http://127.0.0.1:9220/orders/ord_7777
+{"id":"ord_1001","status":"pending","currency":"USD","total":"59.90","items":[{"sku":"BOOK-REST-101","quantity":2}]}
+$ curl -s http://127.0.0.1:9220/orders/ord_1001 -H 'Prefer: example=shipped'
+{"id":"ord_1000","status":"shipped","currency":"USD","total":"24.50","items":[{"sku":"MUG-API-01","quantity":1}]}
+$ curl -s -i -X POST http://127.0.0.1:9220/orders -H 'Content-Type: application/json' -d '{"currency":"EUR","items":[{"sku":"PEN-BLUE-7","quantity":3}]}'
+HTTP/1.1 201 Created
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+Location: string
+Content-type: application/json
+Content-Length: 116
+Date: Mon, 05 Oct 2026 04:40:26 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"id":"ord_1002","status":"pending","currency":"USD","total":"29.95","items":[{"sku":"BOOK-REST-101","quantity":1}]}
+$ curl -s -i -X POST http://127.0.0.1:9220/orders -H 'Content-Type: application/json' -d '{"currency":"usd","items":[{"sku":"PEN-BLUE-7","quantity":0}],"coupon":"X"}'
+HTTP/1.1 422 Unprocessable Entity
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["request","body"],"severity":"Error","code":"additionalProperties","message":"Request body must NOT have additional properties; found 'coupon'"},{"location":["request","body","currency"],"severity":"Error","code":"pattern","message":"Request body property currency must match pattern \"^[A-Z]{3}$\""},{"location":["request","body","items","0","quantity"],"severity":"Error","code":"minimum","message":"Request body property items.0.quantity must be >= 1"}]
+Content-type: application/problem+json
+Content-Length: 95
+Date: Mon, 05 Oct 2026 04:40:26 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/validation","title":"Validation failed","status":422}
+$ curl -s http://127.0.0.1:9220/orders/abc
+{"type":"https://stoplight.io/prism/errors#UNPROCESSABLE_ENTITY","title":"Invalid request","status":422,"detail":"Your request is not valid and no HTTP validation response was found in the spec, so Prism is generating this error for you.","validation":[{"location":["path","orderid"],"severity":"Error","code":"pattern","message":"Request path parameter orderid must match pattern \"^ord_[0-9]+$\""}]}
+$ curl -s http://127.0.0.1:9220/customers
+{"type":"https://stoplight.io/prism/errors#NO_PATH_MATCHED_ERROR","title":"Route not resolved, no path matched","status":404,"detail":"The route /customers hasn't been found in the specification file"}
+$ curl -s http://127.0.0.1:9220/orders/ord_1001 -H 'Prefer: dynamic=true'
+{"currency":"MVO","id":"ord_492233","items":[{"sku":"LUJKFCV-HFGRJQZDGD-82254","quantity":33},{"sku":"OR-AUKSYK-6","quantity":4},{"sku":"AQPLZE-QZZFK-64449247365","quantity":11}],"status":"paid","total":"0170.74"}
+
+===== 2. Prism dynamic mock with a seed, before and after a restart
+$ curl -s http://127.0.0.1:9220/orders/ord_1001
+{"currency":"EQR","id":"ord_541791436","items":[{"sku":"UCTBKTZEW-OLWPYZP-6600434","quantity":65},{"sku":"GF-XCOHJ-2833","quantity":54},{"sku":"GHHMXFNKL-GN-94778443","quantity":15}],"status":"pending","total":"2062.19"}
+(Prism restarted with the same command)
+$ curl -s http://127.0.0.1:9220/orders/ord_1001
+{"currency":"EQR","id":"ord_541791436","items":[{"sku":"UCTBKTZEW-OLWPYZP-6600434","quantity":65},{"sku":"GF-XCOHJ-2833","quantity":54},{"sku":"GHHMXFNKL-GN-94778443","quantity":15}],"status":"pending","total":"2062.19"}
+
+===== 3. Mockoon CLI started from the OpenAPI file
+$ curl -s http://127.0.0.1:9221/orders/ord_1001
+{
+  "id": "",
+  "status": "pending",
+  "currency": "",
+  "total": "",
+  "items": [
+    {
+      "sku": "",
+      "quantity": 40964
+    }
+  ]
+}
+$ curl -s -i -X POST http://127.0.0.1:9221/orders -H 'Content-Type: application/json' -d '{"currency":"usd","items":[{"sku":"PEN-BLUE-7","quantity":0}],"coupon":"X"}'
+HTTP/1.1 201 Created
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS
+Access-Control-Allow-Headers: Content-Type, Origin, Accept, Authorization, Content-Length, X-Requested-With
+Content-Type: application/json; charset=utf-8
+Content-Length: 143
+Date: Mon, 05 Oct 2026 04:40:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "id": "",
+  "status": "cancelled",
+  "currency": "",
+  "total": "",
+  "items": [
+    {
+      "sku": "",
+      "quantity": 49447
+    }
+  ]
+}
+$ ./node_modules/.bin/mockoon-cli import --input openapi.yaml --output logs/mockoon-orders.json > /dev/null
+
+$ node list-mockoon-routes.js logs/mockoon-orders.json
+GET /orders
+  HTTP 200  A list of orders. (default)
+  HTTP 200  twoOrders
+POST /orders
+  HTTP 201  The order was created. (default)
+  HTTP 201  oneBook
+  HTTP 422  The body is valid JSON but breaks a rule.
+  HTTP 422  badQuantity
+GET /orders/:orderId
+  HTTP 200  The order. (default)
+  HTTP 200  pending
+  HTTP 200  shipped
+  HTTP 404  No order with this ID.
+  HTTP 404  notFound
+
+
+===== 4. Stateful mock (openapi-backend)
+$ curl -s -i -X POST http://127.0.0.1:9222/orders -H 'Content-Type: application/json' -d '{"currency":"EUR","items":[{"sku":"PEN-BLUE-7","quantity":3}]}'
+HTTP/1.1 201 Created
+Content-Type: application/json
+Location: /orders/ord_1003
+Date: Mon, 05 Oct 2026 04:40:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+{"id":"ord_1003","status":"pending","currency":"EUR","total":"37.50","items":[{"sku":"PEN-BLUE-7","quantity":3}]}
+$ curl -s http://127.0.0.1:9222/orders/ord_1003
+{"id":"ord_1003","status":"pending","currency":"EUR","total":"37.50","items":[{"sku":"PEN-BLUE-7","quantity":3}]}
+$ curl -s http://127.0.0.1:9222/orders/ord_1004
+{"type":"https://api.example.com/problems/order-not-found","title":"Order not found","status":404,"detail":"No order exists with ID ord_1004."}
+$ curl -s 'http://127.0.0.1:9222/orders?status=pending'
+{"items":[{"id":"ord_1003","status":"pending","currency":"EUR","total":"37.50","items":[{"sku":"PEN-BLUE-7","quantity":3}]}]}
+$ curl -s -X POST http://127.0.0.1:9222/orders -H 'Content-Type: application/json' -d '{"currency":"usd","items":[{"sku":"PEN-BLUE-7","quantity":0}],"coupon":"X"}'
+{"type":"https://api.example.com/problems/validation","title":"Validation failed","status":422,"detail":"The request does not match openapi.yaml.","errors":[{"pointer":"/requestBody","message":"must NOT have additional properties"},{"pointer":"/requestBody/currency","message":"must match pattern \"^[A-Z]{3}$\""},{"pointer":"/requestBody/items/0/quantity","message":"must be >= 1"}]}
+$ curl -s -i -X DELETE http://127.0.0.1:9222/orders
+HTTP/1.1 405 Method Not Allowed
+Content-Type: application/problem+json
+Allow: GET, POST
+Date: Mon, 05 Oct 2026 04:40:31 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+{"type":"about:blank","title":"Method Not Allowed","status":405,"detail":"The path exists but not with this method."}
+
+===== 5. Consumer tests against the stateful mock and against Prism
+$ BASE_URL=http://127.0.0.1:9222 node --test --test-reporter=tap consumer.test.js
+TAP version 13
+# Subtest: a created order can be read back
+ok 1 - a created order can be read back
+  ---
+  duration_ms: 74.54268
+  type: 'test'
+  ...
+# Subtest: an invalid order gets HTTP 422
+ok 2 - an invalid order gets HTTP 422
+  ---
+  duration_ms: 4.847892
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 224.993081
+
+$ BASE_URL=http://127.0.0.1:9220 node --test --test-reporter=tap consumer.test.js
+TAP version 13
+# Subtest: a created order can be read back
+not ok 1 - a created order can be read back
+  ---
+  duration_ms: 155.215104
+  type: 'test'
+  location: '/path/to/openapi-mock-server-example/consumer.test.js:14:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    'USD' !== 'EUR'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'EUR'
+  actual: 'USD'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///path/to/openapi-mock-server-example/consumer.test.js:19:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: an invalid order gets HTTP 422
+ok 2 - an invalid order gets HTTP 422
+  ---
+  duration_ms: 28.213655
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 296.981201
+
+
+===== 6. Prism validation proxy in front of the real API (with bugs)
+$ curl -s -i http://127.0.0.1:9224/orders/ord_1001
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["response","body"],"severity":"Error","code":"additionalProperties","message":"Response body must NOT have additional properties; found 'createdAt'"},{"location":["response","body","total"],"severity":"Error","code":"type","message":"Response body property total must be string"}]
+content-type: application/json
+date: Mon, 05 Oct 2026 04:40:34 GMT
+Content-Length: 148
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"id":"ord_1001","status":"pending","currency":"USD","total":59.9,"items":[{"sku":"BOOK-REST-101","quantity":2}],"createdAt":"2026-10-05T09:30:00Z"}
+$ node contract-check.js; echo "exit code: $?"
+FAIL GET /orders -> HTTP 200
+     response.body.items.0: Response body property items.0 must NOT have additional properties; found 'createdAt'
+     response.body.items.0.total: Response body property items.0.total must be string
+FAIL GET /orders/ord_1001 -> HTTP 200
+     response.body: Response body must NOT have additional properties; found 'createdAt'
+     response.body.total: Response body property total must be string
+PASS GET /orders/ord_9999 -> HTTP 404
+1 passed, 2 failed
+exit code: 1
+
+
+===== 7. Prism proxy with --errors
+$ curl -s -i http://127.0.0.1:9224/orders/ord_1001
+HTTP/1.1 500 Internal Server Error
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["response","body"],"severity":"Error","code":"additionalProperties","message":"Response body must NOT have additional properties; found 'createdAt'"},{"location":["response","body","total"],"severity":"Error","code":"type","message":"Response body property total must be string"}]
+content-type: application/problem+json
+Content-Length: 532
+Date: Mon, 05 Oct 2026 04:40:36 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://stoplight.io/prism/errors#VIOLATIONS","title":"Request/Response not valid","status":500,"detail":"Your request/response is not valid and the --errors flag is set, so Prism is generating this error for you.","validation":[{"location":["response","body"],"severity":"Error","code":"additionalProperties","message":"Response body must NOT have additional properties; found 'createdAt'"},{"location":["response","body","total"],"severity":"Error","code":"type","message":"Response body property total must be string"}]}
+
+===== 8. Contract check after the fix (real API started with FIXED=1)
+$ node contract-check.js; echo "exit code: $?"
+PASS GET /orders -> HTTP 200
+PASS GET /orders/ord_1001 -> HTTP 200
+PASS GET /orders/ord_9999 -> HTTP 404
+3 passed, 0 failed
+exit code: 0
+
+
+===== 9. ci.sh (API with bugs)
+$ bash ci.sh; echo "exit code: $?"
+..
+FAIL GET /orders -> HTTP 200
+     response.body.items.0: Response body property items.0 must NOT have additional properties; found 'createdAt'
+     response.body.items.0.total: Response body property items.0.total must be string
+FAIL GET /orders/ord_1001 -> HTTP 200
+     response.body: Response body must NOT have additional properties; found 'createdAt'
+     response.body.total: Response body property total must be string
+PASS GET /orders/ord_9999 -> HTTP 404
+1 passed, 2 failed
+exit code: 1
+
+===== 10. ci.sh (API fixed)
+$ FIXED=1 bash ci.sh; echo "exit code: $?"
+..
+PASS GET /orders -> HTTP 200
+PASS GET /orders/ord_1001 -> HTTP 200
+PASS GET /orders/ord_9999 -> HTTP 404
+3 passed, 0 failed
+exit code: 0
+
+===== 11. Extra Prism checks (prism mock openapi.yaml --port 9220)
+$ curl -s -i http://127.0.0.1:9220/orders/ord_1001 -H 'Prefer: code=404, example=notFound'
+HTTP/1.1 404 Not Found
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+Content-type: application/problem+json
+Content-Length: 98
+Date: Mon, 05 Oct 2026 04:40:49 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/order-not-found","title":"Order not found","status":404}
+$ curl -s 'http://127.0.0.1:9220/orders/ord_1001?__example=shipped'
+{"id":"ord_1000","status":"shipped","currency":"USD","total":"24.50","items":[{"sku":"MUG-API-01","quantity":1}]}

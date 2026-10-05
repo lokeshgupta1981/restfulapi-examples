@@ -1,0 +1,14 @@
+type: object
+required: [eventId, occurredAt, orderId, status]
+properties:
+  eventId:
+    type: string
+    format: uuid
+  occurredAt:
+    type: string
+    format: date-time
+  orderId:
+    type: string
+  status:
+    type: string
+    enum: [pending, paid, shipped, cancelled]

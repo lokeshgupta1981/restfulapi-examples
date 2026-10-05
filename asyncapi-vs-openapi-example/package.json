@@ -1,0 +1,12 @@
+{
+  "name": "asyncapi-vs-openapi-example",
+  "private": true,
+  "scripts": {
+    "validate:asyncapi": "asyncapi validate asyncapi.yaml",
+    "lint:openapi": "redocly lint openapi.yaml"
+  },
+  "devDependencies": {
+    "@asyncapi/cli": "6.2.0",
+    "@redocly/cli": "2.57.0"
+  }
+}

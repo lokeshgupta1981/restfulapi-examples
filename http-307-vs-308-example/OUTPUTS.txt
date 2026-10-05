@@ -1,0 +1,164 @@
+== 0. Tests
+2 passed in 0.28s
+
+== 1. POST /v1/orders gets HTTP 308
+HTTP/1.1 308 Permanent Redirect
+date: Mon, 05 Oct 2026 04:31:10 GMT
+server: uvicorn
+cache-control: max-age=3600
+content-length: 0
+location: /v2/orders
+
+
+
+== 2. curl -L follows the 308 with the same POST and body
+HTTP/1.1 308 Permanent Redirect
+date: Mon, 05 Oct 2026 04:31:10 GMT
+server: uvicorn
+cache-control: max-age=3600
+content-length: 0
+location: /v2/orders
+
+HTTP/1.1 201 Created
+date: Mon, 05 Oct 2026 04:31:10 GMT
+server: uvicorn
+location: /v2/orders/1001
+content-length: 35
+content-type: application/json
+
+{"sku":"BOOK-42","qty":2,"id":1001}
+
+== 3. Trailing slash: Starlette answers POST /orders/ with HTTP 307
+HTTP/1.1 307 Temporary Redirect
+date: Mon, 05 Oct 2026 04:31:10 GMT
+server: uvicorn
+content-length: 0
+location: http://127.0.0.1:9190/orders
+
+
+
+== 4. HTTP to HTTPS with 308: what curl -v sends on each hop
+> POST /v1/orders HTTP/1.1
+> Host: 127.0.0.1:9191
+> Authorization: Bearer demo-token
+< HTTP/1.1 308 Permanent Redirect
+< location: https://127.0.0.1:9192/v1/orders
+> POST /v1/orders HTTP/1.1
+> Host: 127.0.0.1:9192
+< HTTP/1.1 308 Permanent Redirect
+< location: /v2/orders
+> POST /v2/orders HTTP/1.1
+> Host: 127.0.0.1:9192
+< HTTP/1.1 201 Created
+< location: /v2/orders/1001
+{"sku":"BOOK-42","qty":2,"id":1001}
+
+
+== 5. curl
+POST 301 -> GET  body=0 bytes  Authorization kept
+POST 302 -> GET  body=0 bytes  Authorization kept
+POST 303 -> GET  body=0 bytes  Authorization kept
+POST 307 -> POST body=28 bytes  Authorization kept
+POST 308 -> POST body=28 bytes  Authorization kept
+PUT  301 -> PUT  body=0 bytes  Authorization kept
+PUT  302 -> PUT  body=0 bytes  Authorization kept
+PUT  303 -> PUT  body=0 bytes  Authorization kept
+PUT  307 -> PUT  body=28 bytes  Authorization kept
+PUT  308 -> PUT  body=28 bytes  Authorization kept
+POST 308 to another host -> POST body=28 bytes  Authorization dropped
+POST 301 with -X POST -> POST body=0 bytes  Authorization kept
+POST 301 with --post301 -> POST body=28 bytes  Authorization kept
+
+== 6. Python requests
+POST 301 -> GET  body=0 bytes  Authorization kept
+POST 302 -> GET  body=0 bytes  Authorization kept
+POST 303 -> GET  body=0 bytes  Authorization kept
+POST 307 -> POST body=28 bytes  Authorization kept
+POST 308 -> POST body=28 bytes  Authorization kept
+PUT  301 -> PUT  body=0 bytes  Authorization kept
+PUT  302 -> GET  body=0 bytes  Authorization kept
+PUT  303 -> GET  body=0 bytes  Authorization kept
+PUT  307 -> PUT  body=28 bytes  Authorization kept
+PUT  308 -> PUT  body=28 bytes  Authorization kept
+POST 308 to another host -> POST body=28 bytes  Authorization dropped
+
+== 6b. Python requests: follow a 308 by hand
+Moved for good, update the stored URL: http://127.0.0.1:9190/v1/orders -> http://127.0.0.1:9190/v2/orders
+201 {'sku': 'BOOK-42', 'qty': 2, 'id': 1002}
+
+== 7. Node.js fetch()
+POST 301 -> GET  body=0 bytes  Authorization kept
+POST 302 -> GET  body=0 bytes  Authorization kept
+POST 303 -> GET  body=0 bytes  Authorization kept
+POST 307 -> POST body=28 bytes  Authorization kept
+POST 308 -> POST body=28 bytes  Authorization kept
+PUT  301 -> PUT  body=28 bytes  Authorization kept
+PUT  302 -> PUT  body=28 bytes  Authorization kept
+PUT  303 -> GET  body=0 bytes  Authorization kept
+PUT  307 -> PUT  body=28 bytes  Authorization kept
+PUT  308 -> PUT  body=28 bytes  Authorization kept
+POST 308 to another host -> POST body=28 bytes  Authorization dropped
+POST 307 with a stream body -> TypeError: fetch failed (httpRedirectFetch)
+
+== 8. Java HttpClient
+POST 301 -> GET  body=0 bytes  Authorization kept
+POST 302 -> GET  body=0 bytes  Authorization kept
+POST 303 -> GET  body=0 bytes  Authorization kept
+POST 307 -> POST body=28 bytes  Authorization kept
+POST 308 -> POST body=28 bytes  Authorization kept
+PUT  301 -> PUT  body=28 bytes  Authorization kept
+PUT  302 -> PUT  body=28 bytes  Authorization kept
+PUT  303 -> GET  body=0 bytes  Authorization kept
+PUT  307 -> PUT  body=28 bytes  Authorization kept
+PUT  308 -> PUT  body=28 bytes  Authorization kept
+POST 308 to another host -> POST body=28 bytes  Authorization dropped
+
+== 8b. Java HttpURLConnection
+GET  301 -> HTTP 200 from /echo  GET  body=0 bytes  Authorization kept
+GET  302 -> HTTP 200 from /echo  GET  body=0 bytes  Authorization kept
+GET  307 -> HTTP 200 from /echo  GET  body=0 bytes  Authorization kept
+GET  308 -> HTTP 308 from /lab/308  
+POST 301 -> HTTP 200 from /echo  GET  body=0 bytes  Authorization dropped
+POST 302 -> HTTP 200 from /echo  GET  body=0 bytes  Authorization dropped
+POST 307 -> HTTP 200 from /echo  POST body=28 bytes  Authorization kept
+POST 308 -> HTTP 308 from /lab/308  
+PUT  301 -> HTTP 200 from /echo  PUT  body=28 bytes  Authorization kept
+PUT  302 -> HTTP 200 from /echo  PUT  body=28 bytes  Authorization kept
+PUT  307 -> HTTP 200 from /echo  PUT  body=28 bytes  Authorization kept
+PUT  308 -> HTTP 308 from /lab/308  
+
+== 9. Redirect loop: where each client stops
+curl: stopped after 50 redirects, exit code 47
+requests: TooManyRedirects Exceeded 30 redirects.
+fetch(): fetch failed: redirect count exceeded
+Java HttpClient: returned HTTP 307 from /loop/4
+
+== 10. Browser cache: does Chromium store the redirect?
+Chromium 141.0.7390.37
+Server hits after 3 fetch() calls per URL: {'307': 3, '308': 1, '308 + Cache-Control: no-store': 3}
+
+== 11. Express snippet (run separately from snippets/)
+-- Express 5.2.1: res.redirect(308, ...) and res.redirect(...)
+HTTP/1.1 308 Permanent Redirect
+X-Powered-By: Express
+Cache-Control: max-age=3600
+Location: /v2/orders
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 45
+Date: Mon, 05 Oct 2026 04:28:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+Permanent Redirect. Redirecting to /v2/orders
+HTTP/1.1 302 Found
+X-Powered-By: Express
+Location: /v2/orders
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 32
+Date: Mon, 05 Oct 2026 04:28:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+Found. Redirecting to /v2/orders

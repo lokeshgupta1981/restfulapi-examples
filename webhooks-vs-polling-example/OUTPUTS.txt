@@ -1,0 +1,282 @@
+$ python3 run_experiment.py
+== Scenario 1: same 30 events, polling vs webhooks ==
+[receiver] listening on http://127.0.0.1:9141/webhooks/orders
+[provider] Orders API on http://127.0.0.1:9140
+[provider] new evt_0001 ord_1004
+[receiver] webhook   evt_0001 ord_1004 -> delivered
+[provider] deliver evt_0001 attempt 1 -> 204
+[provider] new evt_0002 ord_1002
+[receiver] webhook   evt_0002 ord_1002 -> paid
+[provider] deliver evt_0002 attempt 1 -> 204
+[provider] new evt_0003 ord_1001
+[receiver] webhook   evt_0003 ord_1001 -> packed
+[provider] deliver evt_0003 attempt 1 -> 204
+[provider] new evt_0004 ord_1013
+[receiver] webhook   evt_0004 ord_1013 -> delivered
+[provider] deliver evt_0004 attempt 1 -> 204
+[provider] new evt_0005 ord_1002
+[receiver] webhook   evt_0005 ord_1002 -> delivered
+[provider] deliver evt_0005 attempt 1 -> 204
+[provider] new evt_0006 ord_1018
+[provider] deliver evt_0006 attempt 1 -> 204
+[receiver] webhook   evt_0006 ord_1018 -> paid
+[provider] new evt_0007 ord_1018
+[receiver] webhook   evt_0007 ord_1018 -> paid
+[provider] deliver evt_0007 attempt 1 -> 204
+[provider] new evt_0008 ord_1012
+[receiver] webhook   evt_0008 ord_1012 -> paid
+[provider] deliver evt_0008 attempt 1 -> 204
+[provider] new evt_0009 ord_1001
+[receiver] webhook   evt_0009 ord_1001 -> packed
+[provider] deliver evt_0009 attempt 1 -> 204
+[provider] new evt_0010 ord_1004
+[receiver] webhook   evt_0010 ord_1004 -> paid
+[provider] deliver evt_0010 attempt 1 -> 204
+[provider] new evt_0011 ord_1017
+[receiver] webhook   evt_0011 ord_1017 -> packed
+[provider] deliver evt_0011 attempt 1 -> 204
+[provider] new evt_0012 ord_1018
+[receiver] webhook   evt_0012 ord_1018 -> packed
+[provider] deliver evt_0012 attempt 1 -> 204
+[provider] new evt_0013 ord_1017
+[receiver] webhook   evt_0013 ord_1017 -> paid
+[provider] deliver evt_0013 attempt 1 -> 204
+[provider] new evt_0014 ord_1019
+[receiver] webhook   evt_0014 ord_1019 -> packed
+[provider] deliver evt_0014 attempt 1 -> 204
+[provider] new evt_0015 ord_1017
+[receiver] webhook   evt_0015 ord_1017 -> delivered
+[provider] deliver evt_0015 attempt 1 -> 204
+[provider] new evt_0016 ord_1014
+[receiver] webhook   evt_0016 ord_1014 -> delivered
+[provider] deliver evt_0016 attempt 1 -> 204
+[provider] new evt_0017 ord_1007
+[receiver] webhook   evt_0017 ord_1007 -> packed
+[provider] deliver evt_0017 attempt 1 -> 204
+[provider] new evt_0018 ord_1007
+[receiver] webhook   evt_0018 ord_1007 -> paid
+[provider] deliver evt_0018 attempt 1 -> 204
+[provider] new evt_0019 ord_1016
+[receiver] webhook   evt_0019 ord_1016 -> delivered
+[provider] deliver evt_0019 attempt 1 -> 204
+[provider] new evt_0020 ord_1014
+[receiver] webhook   evt_0020 ord_1014 -> shipped
+[provider] deliver evt_0020 attempt 1 -> 204
+[provider] new evt_0021 ord_1002
+[receiver] webhook   evt_0021 ord_1002 -> paid
+[provider] deliver evt_0021 attempt 1 -> 204
+[provider] new evt_0022 ord_1005
+[receiver] webhook   evt_0022 ord_1005 -> shipped
+[provider] deliver evt_0022 attempt 1 -> 204
+[provider] new evt_0023 ord_1015
+[receiver] webhook   evt_0023 ord_1015 -> delivered
+[provider] deliver evt_0023 attempt 1 -> 204
+[provider] new evt_0024 ord_1002
+[receiver] webhook   evt_0024 ord_1002 -> shipped
+[provider] deliver evt_0024 attempt 1 -> 204
+[provider] new evt_0025 ord_1011
+[receiver] webhook   evt_0025 ord_1011 -> delivered
+[provider] deliver evt_0025 attempt 1 -> 204
+[provider] new evt_0026 ord_1014
+[receiver] webhook   evt_0026 ord_1014 -> paid
+[provider] deliver evt_0026 attempt 1 -> 204
+[provider] new evt_0027 ord_1008
+[receiver] webhook   evt_0027 ord_1008 -> delivered
+[provider] deliver evt_0027 attempt 1 -> 204
+[provider] new evt_0028 ord_1002
+[receiver] webhook   evt_0028 ord_1002 -> paid
+[provider] deliver evt_0028 attempt 1 -> 204
+[provider] new evt_0029 ord_1009
+[receiver] webhook   evt_0029 ord_1009 -> delivered
+[provider] deliver evt_0029 attempt 1 -> 204
+[provider] new evt_0030 ord_1012
+[receiver] webhook   evt_0030 ord_1012 -> shipped
+[provider] deliver evt_0030 attempt 1 -> 204
+
+client                     requests  with news  empty  events  avg delay  p95 delay  max delay
+poll every 1 s                   75         24     51      30     0.63 s     0.98 s     1.00 s
+poll every 5 s                   15         11      4      30     2.93 s     4.81 s     5.00 s
+poll every 15 s                   5          4      1      30     7.40 s    14.32 s    14.78 s
+poll every 5 s (no ETag)         15         11      4      30     2.93 s     4.81 s     5.00 s
+webhook                          30         30      0      30     0.00 s     0.00 s     0.03 s
+
+poll every 1 s: 50 of the empty answers were HTTP 304
+poll every 5 s: 3 of the empty answers were HTTP 304
+poll every 15 s: 0 of the empty answers were HTTP 304
+poll every 5 s (no ETag): 0 of the empty answers were HTTP 304
+provider: {"events": 30, "feed_requests": 110, "feed_200": 57, "feed_200_empty": 7, "feed_304": 53, "webhook_attempts": 30, "webhook_delivered": 30}
+
+== Scenario 2: receiver down for 21 s, hybrid pattern ==
+[receiver] listening on http://127.0.0.1:9141/webhooks/orders
+[provider] Orders API on http://127.0.0.1:9140
+[provider] new evt_0001 ord_1004
+[receiver] webhook   evt_0001 ord_1004 -> delivered
+[provider] deliver evt_0001 attempt 1 -> 204
+[provider] new evt_0002 ord_1002
+[receiver] webhook   evt_0002 ord_1002 -> paid
+[provider] deliver evt_0002 attempt 1 -> 204
+[provider] new evt_0003 ord_1001
+[receiver] webhook   evt_0003 ord_1001 -> packed
+[provider] deliver evt_0003 attempt 1 -> 204
+[provider] new evt_0004 ord_1013
+[receiver] webhook   evt_0004 ord_1013 -> delivered
+[provider] deliver evt_0004 attempt 1 -> 204
+[provider] new evt_0005 ord_1002
+[receiver] webhook   evt_0005 ord_1002 -> delivered
+[provider] deliver evt_0005 attempt 1 -> 204
+[provider] new evt_0006 ord_1018
+[receiver] webhook   evt_0006 ord_1018 -> paid
+[provider] deliver evt_0006 attempt 1 -> 204
+[provider] new evt_0007 ord_1018
+[receiver] webhook   evt_0007 ord_1018 -> paid
+[provider] deliver evt_0007 attempt 1 -> 204
+[provider] new evt_0008 ord_1012
+[receiver] webhook   evt_0008 ord_1012 -> paid
+[provider] deliver evt_0008 attempt 1 -> 204
+[provider] new evt_0009 ord_1001
+[provider] deliver evt_0009 attempt 1 -> 503
+[provider] new evt_0010 ord_1004
+[provider] deliver evt_0010 attempt 1 -> 503
+[provider] deliver evt_0009 attempt 2 -> 503
+[provider] deliver evt_0010 attempt 2 -> 503
+[provider] new evt_0011 ord_1017
+[provider] deliver evt_0011 attempt 1 -> 503
+[provider] new evt_0012 ord_1018
+[provider] deliver evt_0012 attempt 1 -> 503
+[provider] deliver evt_0009 attempt 3 -> 503
+[provider] deliver evt_0011 attempt 2 -> 503
+[provider] new evt_0013 ord_1017
+[provider] deliver evt_0013 attempt 1 -> 503
+[provider] deliver evt_0012 attempt 2 -> 503
+[provider] deliver evt_0010 attempt 3 -> 503
+[provider] deliver evt_0013 attempt 2 -> 503
+[provider] new evt_0014 ord_1019
+[provider] deliver evt_0014 attempt 1 -> 503
+[provider] deliver evt_0011 attempt 3 -> 503
+[provider] deliver evt_0012 attempt 3 -> 503
+[provider] deliver evt_0014 attempt 2 -> 503
+[provider] deliver evt_0013 attempt 3 -> 503
+[provider] new evt_0015 ord_1017
+[provider] deliver evt_0015 attempt 1 -> 503
+[provider] deliver evt_0009 attempt 4 -> 503
+[provider] gave up on evt_0009 after 4 attempts
+[provider] deliver evt_0015 attempt 2 -> 503
+[provider] deliver evt_0010 attempt 4 -> 503
+[provider] gave up on evt_0010 after 4 attempts
+[provider] deliver evt_0014 attempt 3 -> 503
+[provider] deliver evt_0011 attempt 4 -> 503
+[provider] gave up on evt_0011 after 4 attempts
+[provider] new evt_0016 ord_1014
+[provider] deliver evt_0015 attempt 3 -> 503
+[provider] deliver evt_0016 attempt 1 -> 503
+[provider] deliver evt_0012 attempt 4 -> 503
+[provider] gave up on evt_0012 after 4 attempts
+[provider] new evt_0017 ord_1007
+[provider] deliver evt_0017 attempt 1 -> 503
+[provider] deliver evt_0013 attempt 4 -> 503
+[provider] gave up on evt_0013 after 4 attempts
+[provider] deliver evt_0016 attempt 2 -> 503
+[provider] deliver evt_0017 attempt 2 -> 503
+[provider] deliver evt_0014 attempt 4 -> 503
+[provider] gave up on evt_0014 after 4 attempts
+[provider] deliver evt_0016 attempt 3 -> 503
+[provider] new evt_0018 ord_1007
+[provider] deliver evt_0018 attempt 1 -> 503
+[provider] deliver evt_0017 attempt 3 -> 503
+[provider] deliver evt_0015 attempt 4 -> 503
+[provider] gave up on evt_0015 after 4 attempts
+[provider] deliver evt_0018 attempt 2 -> 503
+[provider] new evt_0019 ord_1016
+[receiver] webhook   evt_0019 ord_1016 -> delivered
+[provider] deliver evt_0019 attempt 1 -> 204
+[receiver] webhook   evt_0018 ord_1007 -> paid
+[provider] deliver evt_0018 attempt 3 -> 204
+[receiver] webhook   evt_0016 ord_1014 -> delivered
+[provider] deliver evt_0016 attempt 4 -> 204
+[receiver] webhook   evt_0017 ord_1007 -> packed
+[provider] deliver evt_0017 attempt 4 -> 204
+[receiver] reconcile evt_0009 ord_1001 -> packed
+[receiver] reconcile evt_0010 ord_1004 -> paid
+[receiver] reconcile evt_0011 ord_1017 -> packed
+[receiver] reconcile evt_0012 ord_1018 -> packed
+[receiver] reconcile evt_0013 ord_1017 -> paid
+[receiver] reconcile evt_0014 ord_1019 -> packed
+[receiver] reconcile evt_0015 ord_1017 -> delivered
+[receiver] reconcile recovered 7 missed event(s)
+[provider] new evt_0020 ord_1014
+[receiver] webhook   evt_0020 ord_1014 -> shipped
+[provider] deliver evt_0020 attempt 1 -> 204
+[provider] new evt_0021 ord_1002
+[receiver] webhook   evt_0021 ord_1002 -> paid
+[provider] deliver evt_0021 attempt 1 -> 204
+[provider] new evt_0022 ord_1005
+[receiver] webhook   evt_0022 ord_1005 -> shipped
+[provider] deliver evt_0022 attempt 1 -> 204
+[provider] new evt_0023 ord_1015
+[receiver] webhook   evt_0023 ord_1015 -> delivered
+[provider] deliver evt_0023 attempt 1 -> 204
+[provider] new evt_0024 ord_1002
+[receiver] webhook   evt_0024 ord_1002 -> shipped
+[provider] deliver evt_0024 attempt 1 -> 204
+[provider] new evt_0025 ord_1011
+[receiver] webhook   evt_0025 ord_1011 -> delivered
+[provider] deliver evt_0025 attempt 1 -> 204
+[provider] new evt_0026 ord_1014
+[receiver] webhook   evt_0026 ord_1014 -> paid
+[provider] deliver evt_0026 attempt 1 -> 204
+[provider] new evt_0027 ord_1008
+[receiver] webhook   evt_0027 ord_1008 -> delivered
+[provider] deliver evt_0027 attempt 1 -> 204
+[provider] new evt_0028 ord_1002
+[receiver] webhook   evt_0028 ord_1002 -> paid
+[provider] deliver evt_0028 attempt 1 -> 204
+[provider] new evt_0029 ord_1009
+[receiver] webhook   evt_0029 ord_1009 -> delivered
+[provider] deliver evt_0029 attempt 1 -> 204
+[provider] new evt_0030 ord_1012
+[receiver] webhook   evt_0030 ord_1012 -> shipped
+[provider] deliver evt_0030 attempt 1 -> 204
+
+events published:            30
+webhook POST attempts:       59 (HTTP 503 answers: 36)
+delivered by webhook:        23
+dead-lettered by provider:   7 ['evt_0009', 'evt_0010', 'evt_0011', 'evt_0012', 'evt_0013', 'evt_0014', 'evt_0015']
+recovered by reconciliation: 7
+duplicate webhooks dropped:  0
+events processed in total:   30 of 30
+reconcile requests:          7
+delay of recovered events:   avg 15.3 s, max 18.3 s
+
+$ ./demo.sh
+# First webhook request, as the receiver on port 9142 sees it
+POST /webhooks/orders HTTP/1.1
+Accept-Encoding: identity
+Content-Length: 193
+Host: 127.0.0.1:9142
+User-Agent: Python-urllib/3.13
+Content-Type: application/json
+Webhook-Id: evt_0001
+Webhook-Timestamp: 1791172940
+Webhook-Signature: v1,ahdhrBDBWxMnVndxwbI7JyQ8V9xYi1SDcuiC3p0BpbE=
+Connection: close
+
+{"id": "evt_0001", "seq": 1, "type": "order.status_changed", "created_at": "2026-10-05T04:02:20.390Z", "created_ts": 1791172940.3902316, "data": {"order_id": "ord_1004", "status": "delivered"}}
+
+$ curl -i "http://127.0.0.1:9140/events?after=0"
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:02:20 GMT
+Content-Type: application/json
+Content-Length: 414
+ETag: "feed-2"
+Cache-Control: no-cache
+
+{"events": [{"id": "evt_0001", "seq": 1, "type": "order.status_changed", "created_at": "2026-10-05T04:02:20.390Z", "created_ts": 1791172940.3902316, "data": {"order_id": "ord_1004", "status": "delivered"}}, {"id": "evt_0002", "seq": 2, "type": "order.status_changed", "created_at": "2026-10-05T04:02:20.917Z", "created_ts": 1791172940.9173672, "data": {"order_id": "ord_1002", "status": "paid"}}], "next_after": 2}
+
+$ curl -i -H 'If-None-Match: "feed-2"' "http://127.0.0.1:9140/events?after=2"
+HTTP/1.1 304 Not Modified
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 04:02:20 GMT
+ETag: "feed-2"
+Cache-Control: no-cache
+
