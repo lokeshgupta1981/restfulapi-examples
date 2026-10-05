@@ -1,0 +1,165 @@
+##### probe.sh (Express 9301, FastAPI 9302, Spring Boot 9303)
+=== 1. Content-Type: application/json
+express  HTTP/1.1 201 Created | Content-Type: application/json; charset=utf-8
+         {"id":1001,"item":"keyboard","quantity":2}
+fastapi  HTTP/1.1 201 Created | content-type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+spring   HTTP/1.1 201  | Content-Type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+
+=== 2. Content-Type: application/json; charset=utf-8
+express  HTTP/1.1 201 Created | Content-Type: application/json; charset=utf-8
+         {"id":1001,"item":"keyboard","quantity":2}
+fastapi  HTTP/1.1 201 Created | content-type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+spring   HTTP/1.1 201  | Content-Type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+
+=== 3. No Content-Type header
+express  HTTP/1.1 415 Unsupported Media Type | Content-Type: application/problem+json; charset=utf-8
+         {"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Send the order as application/json."}
+fastapi  HTTP/1.1 422 Unprocessable Content | content-type: application/json
+         {"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"{\"item\":\"keyboard\",\"quantity\":2}"}]}
+spring   HTTP/1.1 415  | Content-Type: application/problem+json
+         {"detail":"Content-Type 'null' is not supported.","instance":"/orders","status":415,"title":"Unsupported Media Type"}
+
+=== 4. Content-Type: text/plain
+express  HTTP/1.1 415 Unsupported Media Type | Content-Type: application/problem+json; charset=utf-8
+         {"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Send the order as application/json."}
+fastapi  HTTP/1.1 422 Unprocessable Content | content-type: application/json
+         {"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"{\"item\":\"keyboard\",\"quantity\":2}"}]}
+spring   HTTP/1.1 415  | Content-Type: application/problem+json
+         {"detail":"Content-Type 'text/plain' is not supported.","instance":"/orders","status":415,"title":"Unsupported Media Type"}
+
+=== 5. Content-Type: application/x-www-form-urlencoded (curl -d default)
+express  HTTP/1.1 415 Unsupported Media Type | Content-Type: application/problem+json; charset=utf-8
+         {"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Send the order as application/json."}
+fastapi  HTTP/1.1 422 Unprocessable Content | content-type: application/json
+         {"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"{\"item\":\"keyboard\",\"quantity\":2}"}]}
+spring   HTTP/1.1 415  | Content-Type: application/problem+json
+         {"detail":"Content-Type 'application/x-www-form-urlencoded' is not supported.","instance":"/orders","status":415,"title":"Unsupported Media Type"}
+
+=== 6. Content-Type: application/vnd.acme.order+json
+express  HTTP/1.1 415 Unsupported Media Type | Content-Type: application/problem+json; charset=utf-8
+         {"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Send the order as application/json."}
+fastapi  HTTP/1.1 201 Created | content-type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+spring   HTTP/1.1 415  | Content-Type: application/problem+json
+         {"detail":"Content-Type 'application/vnd.acme.order+json' is not supported.","instance":"/orders","status":415,"title":"Unsupported Media Type"}
+
+=== 7. Content-Type: application/json with invalid JSON
+express  HTTP/1.1 400 Bad Request | Content-Type: application/problem+json; charset=utf-8
+         {"title":"entity.parse.failed","status":400,"detail":"Expected double-quoted property name in JSON at position 19 (line 1 column 20)"}
+fastapi  HTTP/1.1 422 Unprocessable Content | content-type: application/json
+         {"detail":[{"type":"json_invalid","loc":["body",18],"msg":"JSON decode error","input":{},"ctx":{"error":"Illegal trailing comma before end of object"}}]}
+spring   HTTP/1.1 400  | Content-Type: application/problem+json
+         {"detail":"Failed to read request","instance":"/orders","status":400,"title":"Bad Request"}
+
+=== 8. Content-Type: application/json; charset=iso-8859-1
+express  HTTP/1.1 415 Unsupported Media Type | Content-Type: application/problem+json; charset=utf-8
+         {"title":"charset.unsupported","status":415,"detail":"unsupported charset \"ISO-8859-1\""}
+fastapi  HTTP/1.1 201 Created | content-type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+spring   HTTP/1.1 201  | Content-Type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+
+=== 9. Content-Type: Application/JSON (uppercase)
+express  HTTP/1.1 201 Created | Content-Type: application/json; charset=utf-8
+         {"id":1001,"item":"keyboard","quantity":2}
+fastapi  HTTP/1.1 201 Created | content-type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+spring   HTTP/1.1 201  | Content-Type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+
+=== 10. Valid JSON request with Accept: application/xml
+express  HTTP/1.1 201 Created | Content-Type: application/json; charset=utf-8
+         {"id":1001,"item":"keyboard","quantity":2}
+fastapi  HTTP/1.1 201 Created | content-type: application/json
+         {"id":1001,"item":"keyboard","quantity":2}
+spring   HTTP/1.1 406  | Content-Type: application/problem+json
+         {"detail":"Acceptable representations: [application/json, application/*+json].","instance":"/orders","status":406,"title":"Not Acceptable"}
+
+=== 11. Express route without a Content-Type check, Content-Type: text/plain
+{"receivedBody":null}
+
+=== 12. Full response from the Spring Boot app (curl -i --json)
+HTTP/1.1 201 
+Content-Type: application/json
+Content-Length: 42
+Date: Mon, 05 Oct 2026 11:21:52 GMT
+
+{"id":1001,"item":"keyboard","quantity":2}
+
+=== 13. Request and response headers (curl -v --json, Spring Boot app)
+> POST /orders HTTP/1.1
+> Host: 127.0.0.1:9303
+> User-Agent: curl/8.5.0
+> Content-Type: application/json
+> Accept: application/json
+> Content-Length: 32
+> 
+< HTTP/1.1 201 
+< Content-Type: application/json
+< Content-Length: 42
+< Date: Mon, 05 Oct 2026 11:21:52 GMT
+< 
+{ [42 bytes data]
+{"id":1001,"item":"keyboard","quantity":2}
+
+
+##### 415 responses with headers
+HTTP/1.1 415 Unsupported Media Type
+X-Powered-By: Express
+Accept: application/json
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 115
+ETag: W/"73-wajgrh3YhwWhfetIC9agTbkIPDE"
+Date: Mon, 05 Oct 2026 11:21:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Send the order as application/json."}
+HTTP/1.1 415 
+Accept: application/json
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 11:21:52 GMT
+
+{"detail":"Content-Type 'text/plain' is not supported.","instance":"/orders","status":415,"title":"Unsupported Media Type"}
+
+##### express/plus_json.mjs (port 9399)
+application/vnd.acme.order+json 201 {"id":1001,"item":"keyboard","quantity":2}
+application/merge-patch+json 201 {"id":1001,"item":"keyboard","quantity":2}
+text/plain 415 Accept: application/json, application/*+json
+
+##### clients/clients.sh (echo server 9300)
+--- curl
+{"client": "curl -d", "contentType": "application/x-www-form-urlencoded", "accept": "*/*", "body": "{\"item\":\"keyboard\",\"quantity\":2}"}
+{"client": "curl --json", "contentType": "application/json", "accept": "application/json", "body": "{\"item\":\"keyboard\",\"quantity\":2}"}
+--- Python requests
+{"client": "requests json=", "contentType": "application/json", "accept": "*/*", "body": "{\"item\": \"keyboard\", \"quantity\": 2}"}
+{"client": "requests data=dict", "contentType": "application/x-www-form-urlencoded", "accept": "*/*", "body": "item=keyboard&quantity=2"}
+{"client": "requests data=str", "contentType": null, "accept": "*/*", "body": "{\"item\": \"keyboard\", \"quantity\": 2}"}
+--- Node.js fetch
+{"client": "fetch, no Content-Type", "contentType": "text/plain;charset=UTF-8", "accept": "*/*", "body": "{\"item\":\"keyboard\",\"quantity\":2}"}
+{"client": "fetch, Content-Type set", "contentType": "application/json", "accept": "*/*", "body": "{\"item\":\"keyboard\",\"quantity\":2}"}
+{"client": "fetch, object body", "contentType": "text/plain;charset=UTF-8", "accept": "*/*", "body": "[object Object]"}
+--- Java HttpClient
+{"client": "HttpClient, no Content-Type", "contentType": null, "accept": null, "body": "{\"item\":\"keyboard\",\"quantity\":2}"}
+{"client": "HttpClient, headers set", "contentType": "application/json", "accept": "application/json", "body": "{\"item\":\"keyboard\",\"quantity\":2}"}
+--- Node.js: parsing a non-JSON response
+SyntaxError: Unexpected token '<', "<html><bod"... is not valid JSON
+HTTP 502, expected JSON but got text/html
+
+##### cors/cors_check.py (page 9310, API 9311)
+/orders text/plain -> HTTP 201
+/orders application/json -> HTTP 201
+browser console: Access to fetch at 'http://127.0.0.1:9311/legacy-orders' from origin 'http://127.0.0.1:9310' has been blocked by CORS policy: Request header field content-type is not allowed by Access-Control-Allow-Headers in preflight response.
+browser console: Failed to load resource: net::ERR_FAILED
+/legacy-orders application/json -> TypeError: Failed to fetch
+--- API log (cors/api.log)
+Page on http://127.0.0.1:9310, API on http://127.0.0.1:9311
+API got POST /orders (Content-Type: text/plain, Access-Control-Request-Headers: None) -> 201
+API got OPTIONS /orders (Content-Type: None, Access-Control-Request-Headers: content-type) -> 204
+API got POST /orders (Content-Type: application/json, Access-Control-Request-Headers: None) -> 201
+API got OPTIONS /legacy-orders (Content-Type: None, Access-Control-Request-Headers: content-type) -> 204

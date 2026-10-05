@@ -1,0 +1,113 @@
+Captured 2026-10-05 on Linux: Python 3.13.16, Node.js 22.22.0, Go 1.24.7, OpenJDK 21.0.12, Maven 3.9.11, jq 1.7, curl 8.5.0
+Packages: json5 0.15.0 and jsonschema 4.26.0 (PyPI); json5 2.2.3, jsonc-parser 3.3.1, strip-json-comments 5.0.3, typescript 7.0.2 (npm); tools.jackson.core:jackson-databind 3.2.3 (Maven)
+Command: bash demo.sh
+
+## Python strict json module
+orders-service.jsonc: JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+trailing-comma.jsonc: JSONDecodeError: Illegal trailing comma before end of object: line 3 column 53 (char 70)
+
+## Python json5 package
+orders-service.jsonc: {'port': 8080, 'paymentUrl': 'https://sandbox.pay.example.com/v2', 'retry': {'maxAttempts': 3, 'backoffMs': 200}}
+orders-service.json5: {'port': 8080, 'paymentUrl': 'https://sandbox.pay.example.com/v2', 'retry': {'maxAttempts': 3, 'backoffMs': 200}, 'featureFlags': 15, 'discountRate': 0.15}
+{"port": 8080, "paymentUrl": "https://sandbox.pay.example.com/v2", "retry": {"maxAttempts": 3, "backoffMs": 200}, "featureFlags": 15, "discountRate": 0.15}
+
+## Python naive regex strip
+  "paymentUrl": "https:
+JSONDecodeError: Invalid control character at: line 5 column 24 (char 45)
+json5: https://sandbox.pay.example.com/v2
+
+## Python comment keys
+Keys after parsing: ['_comment', 'port', '//', 'paymentUrl', 'retry']
+Value of "//": Switch to the live URL only in production
+Schema error: Additional properties are not allowed ('//', '_comment' were unexpected)
+{
+  "_comment": "Settings for the orders service",
+  "port": 8080,
+  "//": "Switch to the live URL only in production",
+  "paymentUrl": "https://sandbox.pay.example.com/v2",
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200
+  }
+}
+
+## Node.js JSON.parse()
+orders-service.jsonc: SyntaxError: Unexpected token '/', "// Setting"... is not valid JSON
+trailing-comma.jsonc: SyntaxError: Expected double-quoted property name in JSON at position 72 (line 4 column 1)
+
+## Node.js jsonc-parser, strip-json-comments, json5
+jsonc-parser: {"port":8080,"paymentUrl":"https://sandbox.pay.example.com/v2","retry":{"maxAttempts":3,"backoffMs":200}} errors: 0
+jsonc-parser trailing comma: [ 'PropertyNameExpected at offset 72', 'ValueExpected at offset 72' ]
+jsonc-parser allowTrailingComma: 0 errors
+strip-json-comments: https://sandbox.pay.example.com/v2
+jsonc-parser stripComments: https://sandbox.pay.example.com/v2
+json5 (.jsonc): {"port":8080,"paymentUrl":"https://sandbox.pay.example.com/v2","retry":{"maxAttempts":3,"backoffMs":200}}
+json5 (.json5): {"port":8080,"paymentUrl":"https://sandbox.pay.example.com/v2","retry":{"maxAttempts":3,"backoffMs":200},"featureFlags":15,"discountRate":0.15}
+
+## Node.js jsonc-parser format()
+{
+  "port": 8080, // HTTP port
+  "retry": {
+    "maxAttempts": 3, /* per request */
+    "backoffMs": 200
+  }
+}
+
+## Go encoding/json
+orders-service.jsonc: invalid character '/' looking for beginning of value
+trailing-comma.jsonc: invalid character '}' looking for beginning of object key string
+
+## Java Jackson 3
+Strict: StreamReadException: Unexpected character ('/' (code 47)): maybe a (non-standard) comment? (not recognized as one since Feature 'ALLOW_COMMENTS' not enabled for parser)
+Strict, trailing comma: StreamReadException: Unexpected character ('}' (code 125)): was expecting double-quote to start property name
+JSONC: {"port":8080,"paymentUrl":"https://sandbox.pay.example.com/v2","retry":{"maxAttempts":3,"backoffMs":200}}
+maxAttempts = 3
+
+## jq
+jq: parse error: Invalid numeric literal at line 1, column 3
+jq: parse error: Expected another key-value pair at line 4, column 1
+
+## python -m json.tool
+Expecting value: line 1 column 1 (char 0)
+
+## tsc --showConfig
+Version 7.0.2
+{
+    "compilerOptions": {
+        "outDir": "./dist",
+        "strict": true,
+        "target": "es2022"
+    },
+    "files": [
+        "./src/index.ts"
+    ],
+    "include": [
+        "src"
+    ],
+    "exclude": [
+    ]
+}
+
+## Orders API
+### POST with a comment
+HTTP/1.0 400 Bad Request
+Content-Type: application/problem+json
+Content-Length: 179
+
+{
+  "type": "https://example.com/problems/invalid-json",
+  "title": "Request body is not valid JSON",
+  "status": 400,
+  "detail": "Expecting ',' delimiter at line 2, column 46"
+}
+
+### POST without a comment
+HTTP/1.0 201 Created
+Content-Type: application/json
+Content-Length: 67
+
+{"id": 43, "status": "NEW", "items": [{"sku": "BOOK-1", "qty": 2}]}
+
+### fetch() client
+/orders/42 -> 200 {"id":42,"status":"PAID","total":59.9}
+/legacy/orders/42 -> 200 SyntaxError: Expected property name or '}' in JSON at position 4 (line 2 column 3)

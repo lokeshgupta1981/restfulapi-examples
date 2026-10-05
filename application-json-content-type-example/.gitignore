@@ -1,0 +1,5 @@
+node_modules/
+.venv/
+target/
+cors/api.log
+__pycache__/

@@ -1,0 +1,126 @@
+$ python write_jsonl.py
+wrote data/orders.jsonl (302 bytes)
+$ cat data/orders.jsonl
+{"id":"ord_1001","customer":"Ana","total":42.5,"status":"paid"}
+{"id":"ord_1002","customer":"Bo","total":18.0,"status":"pending"}
+{"id":"ord_1003","customer":"Chloé","total":99.9,"status":"paid","note":"Leave at the door.\nRing twice."}
+{"id":"ord_1004","customer":"Dev","total":7.25,"status":"paid"}
+$ python read_jsonl.py data/orders.jsonl
+4 orders, paid total 149.65
+$ python read_jsonl.py data/orders-bad.jsonl
+stopped: line 2: Expecting ',' delimiter (column 63)
+exit code 1
+$ python read_jsonl.py data/orders-bad.jsonl --skip-bad
+line 2: skipped, Expecting ',' delimiter (column 63)
+line 3: blank line skipped
+2 orders, paid total 12.00
+$ node read_jsonl.mjs data/orders-bad.jsonl
+1 ord_2001 Eva
+line 2: Expected ',' or '}' after property value in JSON at position 62 (line 1 column 63)
+4 ord_2003 Gus
+2 orders read
+$ python splitlines_bug.py
+split('\n'): ['ord_1005']
+splitlines(): Unterminated string starting at: line 1 column 28 (char 27)
+$ python batch_requests.py
+data/batch-input.jsonl: 4 requests, 1297 bytes, custom_id values unique
+$ head -n 1 data/batch-input.jsonl | jq .
+{
+  "custom_id": "ord_1001",
+  "method": "POST",
+  "url": "/v1/chat/completions",
+  "body": {
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "system",
+        "content": "Write a one-sentence shipping update."
+      },
+      {
+        "role": "user",
+        "content": "{\"id\": \"ord_1001\", \"customer\": \"Ana\", \"total\": 42.5, \"status\": \"paid\"}"
+      }
+    ],
+    "max_tokens": 60
+  }
+}
+$ python -c "import json; json.load(open('data/orders.jsonl'))"
+json.decoder.JSONDecodeError: Extra data: line 2 column 1 (char 64)
+$ node -e "JSON.parse(require('fs').readFileSync('data/orders.jsonl', 'utf8'))"
+SyntaxError: Unexpected non-whitespace character after JSON at position 64 (line 2 column 1)
+$ wc -l data/orders.jsonl
+4 data/orders.jsonl
+$ jq -c 'select(.status == "paid") | {id, total}' data/orders.jsonl
+{"id":"ord_1001","total":42.5}
+{"id":"ord_1003","total":99.9}
+{"id":"ord_1004","total":7.25}
+$ jq -s 'map(.total) | add' data/orders.jsonl
+167.65
+$ jq -s '.' data/orders.jsonl > data/orders.json
+[
+  {
+    "id": "ord_1001",
+    "customer": "Ana",
+    "total": 42.5,
+    "statu
+$ jq -c '.[]' data/orders.json
+{"id":"ord_1001","customer":"Ana","total":42.5,"status":"paid"}
+{"id":"ord_1002","customer":"Bo","total":18.0,"status":"pending"}
+{"id":"ord_1003","customer":"Chloé","total":99.9,"status":"paid","note":"Leave at the door.\nRing twice."}
+{"id":"ord_1004","customer":"Dev","total":7.25,"status":"paid"}
+$ gzip -kf data/orders.jsonl && zcat data/orders.jsonl.gz | jq -c .
+{"id":"ord_1001","customer":"Ana","total":42.5,"status":"paid"}
+{"id":"ord_1002","customer":"Bo","total":18.0,"status":"pending"}
+{"id":"ord_1003","customer":"Chloé","total":99.9,"status":"paid","note":"Leave at the door.\nRing twice."}
+{"id":"ord_1004","customer":"Dev","total":7.25,"status":"paid"}
+$ jq -c . data/orders-bad.jsonl
+{"id":"ord_2001","customer":"Eva","total":12.0,"status":"paid"}
+jq: parse error: Expected separator between values at line 4, column 1
+$ jq -cR 'fromjson? // empty' data/orders-bad.jsonl
+{"id":"ord_2001","customer":"Eva","total":12.0,"status":"paid"}
+{"id":"ord_2003","customer":"Gus","total":5.5,"status":"pending"}
+$ curl -sN -i http://127.0.0.1:9387/orders/export
+HTTP/1.1 200 OK
+Content-Type: application/jsonl
+Connection: keep-alive
+Transfer-Encoding: chunked
+
+{"id":"ord_1001","customer":"Ana","total":42.5,"status":"paid"}
+{"id":"ord_1002","customer":"Bo","total":18,"status":"pending"}
+{"id":"ord_1003","customer":"Chloé","total":99.9,"status":"paid","note":"Leave at the door.\nRing twice."}
+{"id":"ord_1004","customer":"Dev","total":7.25,"status":"paid"}
+$ curl -sN http://127.0.0.1:9387/orders/export | jq -c "{id, status}"
+{"id":"ord_1001","status":"paid"}
+{"id":"ord_1002","status":"pending"}
+{"id":"ord_1003","status":"paid"}
+{"id":"ord_1004","status":"paid"}
+$ python client.py
+Content-Type: application/jsonl
+ 0.0s ord_1001 paid
+ 0.2s ord_1002 pending
+ 0.4s ord_1003 paid
+ 0.6s ord_1004 paid
+$ node client.mjs
+Content-Type: application/jsonl
+0.1s ord_1001 paid
+0.3s ord_1002 pending
+0.5s ord_1003 paid
+0.7s ord_1004 paid
+$ mvn -q compile exec:java -Dexec.args=http
+== orders.jsonl
+1 ord_1001 42.5
+2 ord_1002 18.0
+3 ord_1003 99.9
+4 ord_1004 7.25
+== orders-bad.jsonl
+1 ord_2001 12.0
+2 skipped: JsonEOFException at column 63
+4 ord_2003 5.5
+== wrote orders-java.jsonl
+{"id":"ord_3001","customer":"Hana","total":15.0,"status":"paid"}
+{"id":"ord_3002","customer":"Ivo","total":64.2,"status":"pending"}
+== GET /orders/export
+0.1s ord_1001 paid
+0.3s ord_1002 pending
+0.5s ord_1003 paid
+0.7s ord_1004 paid

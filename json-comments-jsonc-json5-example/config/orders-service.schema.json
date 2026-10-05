@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "port": { "type": "integer" },
+    "paymentUrl": { "type": "string", "format": "uri" },
+    "retry": { "type": "object" }
+  },
+  "required": ["port", "paymentUrl"],
+  "additionalProperties": false
+}

@@ -1,0 +1,4 @@
+{
+  "port": 8080,
+  "paymentUrl": "https://sandbox.pay.example.com/v2",
+}

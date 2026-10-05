@@ -1,0 +1,11 @@
+{
+  "_comment": "Settings for the orders service",
+  "port": 8080,
+  "//": "The payment provider's sandbox URL",
+  "paymentUrl": "https://sandbox.pay.example.com/v2",
+  "//": "Switch to the live URL only in production",
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200
+  }
+}
