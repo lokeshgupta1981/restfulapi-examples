@@ -1,0 +1,165 @@
+=== Basic header bytes
+   r   e   p   o   r   t   s   -   a   p   p   :   d   e   m   o
+   -   p   a   s   s   -   1   2   3
+cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
+
+=== Express parsing helpers (express/parse_demo.mjs)
+{ name: 'reports-app', pass: 'demo-pass-123' }
+{ name: 'reports-app', pass: 'demo-pass-123' }
+demo-token-123
+null
+BasiccmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
+(malformed)
+Bearer
+
+=== Probe grid (Express 9761, FastAPI 9762, Spring Boot 9763)
+Authorization header sent                     Expr  Fast   Spr
+Basic <base64>                                 200   200   200
+basic <base64> (lowercase scheme)              200   200   200
+BASIC <base64> (uppercase scheme)              200   200   200
+Basic<base64> (no space)                       401   401   401
+Basic  <base64> (two spaces)                   200   200   401
+Basic <base64 without padding>                 200   401   200
+Basic reports-app:demo-pass-123                401   401   401
+two headers: valid, then wrong                 200   200   200
+two headers: wrong, then valid                 401   401   401
+no Authorization header                        401   401   401
+Bearer <token>                                 200   200   200
+bearer <token> (lowercase scheme)              200   200   200
+Bearer<token> (no space)                       401   401   401
+Bearer  <token> (two spaces)                   200   200   401
+Bearer "<token>" (quoted)                      401   401   401
+<token> (no scheme)                            401   401   401
+Token <token> (wrong scheme)                   401   401   401
+two headers: Bearer <token> twice              200   200   200
+
+=== Express 401 response without credentials
+HTTP/1.1 401 Unauthorized
+X-Powered-By: Express
+WWW-Authenticate: Basic realm="orders", charset="UTF-8"
+Content-Type: application/json; charset=utf-8
+Content-Length: 42
+ETag: W/"2a-WjHYhryzoIS9NGA9fmN+EYF/Zow"
+Date: Mon, 05 Oct 2026 12:24:23 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"missing or invalid credentials"}
+=== Spring Boot response to Bearer with two spaces
+HTTP/1.1 401 
+WWW-Authenticate: Bearer error="invalid_token", error_description="Bearer token is malformed", error_uri="https://tools.ietf.org/html/rfc6750#section-3.1", resource_metadata="http://127.0.0.1:9763/.well-known/oauth-protected-resource"
+=== FastAPI response to Basic without padding
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:24:22 GMT
+server: uvicorn
+www-authenticate: Basic realm="orders"
+content-length: 30
+content-type: application/json
+
+{"detail":"Not authenticated"}
+=== FastAPI response with no header on /bearer/orders
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:24:22 GMT
+server: uvicorn
+www-authenticate: Bearer
+content-length: 30
+content-type: application/json
+
+{"detail":"Not authenticated"}
+=== curl
+--- curl -u (Basic built by curl)
+{"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -H with a Bearer token
+{"host": "127.0.0.1:9771", "authorization": ["Bearer demo-token-123"], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -L -H, redirect to-same
+{"host": "127.0.0.1:9771", "authorization": ["Bearer demo-token-123"], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -L -H, redirect to-port
+{"host": "127.0.0.1:9772", "authorization": [], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -L -H, redirect to-host
+{"host": "localhost:9771", "authorization": [], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -L -u, redirect to-same
+{"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -L -u, redirect to-port
+{"host": "127.0.0.1:9772", "authorization": [], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl -L -u, redirect to-host
+{"host": "localhost:9771", "authorization": [], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl --location-trusted -u, redirect to-host
+{"host": "localhost:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl through a proxy: -U sends Proxy-Authorization, -u sends Authorization
+{"host": "orders.example", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": ["Basic cHJveHktdXNlcjpkZW1vLXByb3h5LXBhc3M="], "user_agent": "curl/8.5.0"}
+
+=== Python requests
+['Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==']
+['Bearer demo-token-123']
+redirect to-same  127.0.0.1:9771 ['Bearer demo-token-123']
+redirect to-port  127.0.0.1:9772 []
+redirect to-host  localhost:9771 []
+
+=== Node.js fetch
+Basic by hand   [ 'Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==' ]
+redirect to-same  127.0.0.1:9771 [ 'Bearer demo-token-123' ]
+redirect to-port  127.0.0.1:9772 []
+redirect to-host  localhost:9771 []
+
+=== Browser-style Basic encoding (btoa and TextEncoder)
+Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
+UTF-8 via encoder    Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbDqS0xMjM=
+btoa() on the text   Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbpLTEyMw==
+btoa() with a euro sign throws InvalidCharacterError
+
+=== Java HttpClient
+Basic by hand   {"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
+redirect to-same  {"host": "127.0.0.1:9771", "authorization": ["Bearer demo-token-123"], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
+redirect to-port  {"host": "127.0.0.1:9772", "authorization": [], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
+redirect to-host  {"host": "localhost:9771", "authorization": [], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
+
+=== Non-ASCII password in Basic
+requests sends     Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbpLTEyMw==
+decoded bytes      b'reports-app:demo-caf\xe9-123'
+UTF-8 by hand      Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbDqS0xMjM=
+decoded bytes      b'reports-app:demo-caf\xc3\xa9-123'
+requests with bytes Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbDqS0xMjM=
+
+=== Chromium CORS and redirect check
+/orders -> 200 {"orders": [1001, 1002]}
+/orders-wildcard -> 200 {"orders": [1001, 1002]}
+/redirect-same -> 200 {"authorization": "Bearer demo-token-123"}
+/redirect-port -> 200 {"authorization": null}
+/redirect -> 200 {"authorization": null}
+
+=== Express server log during probe.sh
+Express on http://127.0.0.1:9761
+GET /basic/orders auth-scheme=Basic
+GET /basic/orders auth-scheme=basic
+GET /basic/orders auth-scheme=BASIC
+GET /basic/orders auth-scheme=(malformed)
+GET /basic/orders auth-scheme=Basic
+GET /basic/orders auth-scheme=Basic
+GET /basic/orders auth-scheme=Basic
+GET /basic/orders auth-scheme=Basic
+GET /basic/orders auth-scheme=Basic
+GET /basic/orders auth-scheme=-
+GET /bearer/orders auth-scheme=Bearer
+GET /bearer/orders auth-scheme=bearer
+GET /bearer/orders auth-scheme=(malformed)
+GET /bearer/orders auth-scheme=Bearer
+GET /bearer/orders auth-scheme=Bearer
+GET /bearer/orders auth-scheme=(malformed)
+GET /bearer/orders auth-scheme=Token
+GET /bearer/orders auth-scheme=Bearer
+
+=== CORS demo server log
+API got OPTIONS /orders Access-Control-Request-Headers: authorization
+API got GET 127.0.0.1:9781/orders Authorization: Bearer demo-token-123
+API got OPTIONS /orders-wildcard Access-Control-Request-Headers: authorization
+API got GET 127.0.0.1:9781/orders-wildcard Authorization: Bearer demo-token-123
+API got OPTIONS /redirect-same Access-Control-Request-Headers: authorization
+API got GET 127.0.0.1:9781/redirect-same Authorization: Bearer demo-token-123
+API got OPTIONS /echo Access-Control-Request-Headers: authorization
+API got GET 127.0.0.1:9781/echo Authorization: Bearer demo-token-123
+API got OPTIONS /redirect-port Access-Control-Request-Headers: authorization
+API got GET 127.0.0.1:9781/redirect-port Authorization: Bearer demo-token-123
+API got GET 127.0.0.1:9782/echo Authorization: None
+API got OPTIONS /redirect Access-Control-Request-Headers: authorization
+API got GET 127.0.0.1:9781/redirect Authorization: Bearer demo-token-123
+API got GET localhost:9781/echo Authorization: None

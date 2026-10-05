@@ -1,0 +1,111 @@
+== Token request (opaque)
+{"access_token":"PVx3RAj1CIivYdbZL1Ogm0tXI8kYLMHwZUL6L5CMpTs","token_type":"Bearer","expires_in":300,"scope":"orders:read"}
+== Token request (jwt), first 60 characters of the response
+{"access_token":"eyJhbGciOiJSUzI1NiIsImtpZCI6ImRlbW8ta2V5LTE
+...
+== Introspection of an active token
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:31:16 GMT
+server: uvicorn
+content-length: 294
+content-type: application/json
+
+{"active":true,"token_type":"Bearer","iss":"http://127.0.0.1:9400","sub":"orders-app","aud":"https://api.example.com/orders","client_id":"orders-app","scope":"orders:read","iat":1791203476,"exp":1791203776,"jti":"e7f2f242-5ef8-4fb8-b16a-334a6a3f9afd","tenant":"acme-retail","plan":"enterprise"}
+== Introspection of an unknown token
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:31:16 GMT
+server: uvicorn
+content-length: 16
+content-type: application/json
+
+{"active":false}
+== Introspection without API credentials
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:31:16 GMT
+server: uvicorn
+www-authenticate: Basic realm="token-service"
+content-length: 26
+content-type: application/json
+
+{"error":"invalid_client"}
+== Introspection asking for the JWT form (phantom token)
+eyJhbGciOiJSUzI1NiIsImtpZCI6ImRlbW8ta2V5LTEiLCJ0eXAiOiJhdCtq
+...
+== JWKS
+{
+    "keys": [
+        {
+            "kty": "RSA",
+            "key_ops": [
+                "verify"
+            ],
+            "n": "y_EoktMIEiDRRrhBXYvJJUf9s4-ok1sNqcKzit1zn9if2Hnwl5VM
+            "e": "AQAB",
+            "kid": "demo-key-1",
+            "use": "sig",
+            "alg": "RS256"
+        }
+    ]
+}
+== Authorization server metadata
+{
+    "issuer": "http://127.0.0.1:9400",
+    "token_endpoint": "http://127.0.0.1:9400/token",
+    "jwks_uri": "http://127.0.0.1:9400/jwks",
+    "introspection_endpoint": "http://127.0.0.1:9400/introspect",
+    "revocation_endpoint": "http://127.0.0.1:9400/revoke"
+}
+== Orders API call with a token that lacks orders:read
+HTTP/1.1 403 Forbidden
+date: Mon, 05 Oct 2026 12:31:16 GMT
+server: uvicorn
+www-authenticate: Bearer error="insufficient_scope", error_description="orders:read required", scope="orders:read"
+content-length: 73
+content-type: application/json
+
+{"error":"insufficient_scope","error_description":"orders:read required"}
+
+== 1. Token sizes
+opaque token : b-VTzkfuhpYeXYEZIuQwP3ZDKMLDiPiXmoGsCeMk6x0
+opaque length: 43 characters
+JWT length   : 754 characters
+JWT parts    : header 66 + payload 344 + signature 342
+same claims signed with ES256: 498 characters
+
+== 2. Decoding the JWT payload without any key
+{
+  "iss": "http://127.0.0.1:9400",
+  "sub": "orders-app",
+  "aud": "https://api.example.com/orders",
+  "client_id": "orders-app",
+  "scope": "orders:read",
+  "iat": 1791203476,
+  "exp": 1791203776,
+  "jti": "02a1eaa3-d0f2-4985-aefe-90154932e213",
+  "tenant": "acme-retail",
+  "plan": "enterprise"
+}
+
+== 3. Latency, 1000 sequential requests per mode
+mode                                    p50 ms  p95 ms  p99 ms  check p50  introspections
+(introspections include 50 warm-up calls)
+JWT, local signature check                1.61    2.27    3.39      0.313               0
+Opaque, introspection every call          3.07    4.12    5.04      1.660            1050
+Opaque, introspection + 10 s cache        1.28    1.77    2.11      0.019               1
+Phantom token via gateway                 3.21    4.08    4.78      0.364               1
+
+== 4. Revocation
+before revoke: JWT local       -> 200
+before revoke: opaque cached   -> 200
+before revoke: phantom gateway -> 200
+revoked both tokens at the authorization server (POST /revoke)
+after revoke : JWT local       -> 200
+after revoke : JWT introspected-> 401
+after revoke : opaque introsp. -> 401
+after revoke : opaque cached   -> 200
+after revoke : phantom gateway -> 200
+11 s later  : opaque cached   -> 401
+11 s later  : phantom gateway -> 401
+401 challenge: Bearer error="invalid_token", error_description="Token is not active"
+== Header size check (node header_size_check.mjs)
+v22.22.0 431 Request Header Fields Too Large

@@ -36,3 +36,9 @@ and each folder has its own README with the versions used and the run commands.
 | [json-comments-jsonc-json5-example](json-comments-jsonc-json5-example/) | [Comments in JSON: JSONC and JSON5](https://restfulapi.net/json-comments-jsonc-json5/) |
 | [form-urlencoded-vs-multipart-vs-json-example](form-urlencoded-vs-multipart-vs-json-example/) | [x-www-form-urlencoded vs multipart/form-data vs JSON](https://restfulapi.net/form-urlencoded-vs-multipart-vs-json/) |
 | [application-json-content-type-example](application-json-content-type-example/) | [application/json: The JSON Content-Type](https://restfulapi.net/application-json-content-type/) |
+| [authorization-header-example](authorization-header-example/) | [Authorization Header: Basic, Bearer and Other Schemes](https://restfulapi.net/authorization-header/) |
+| [www-authenticate-header-example](www-authenticate-header-example/) | [WWW-Authenticate Header: Challenges and Examples](https://restfulapi.net/www-authenticate-header/) |
+| [opaque-tokens-vs-jwt-example](opaque-tokens-vs-jwt-example/) | [Opaque Tokens vs JWT: Which Access Token to Use](https://restfulapi.net/opaque-tokens-vs-jwt/) |
+| [hmac-authentication-example](hmac-authentication-example/) | [HMAC Authentication: Signing API Requests and Webhooks](https://restfulapi.net/hmac-authentication/) |
+| [http-status-406-not-acceptable-example](http-status-406-not-acceptable-example/) | [HTTP 406 Not Acceptable](https://restfulapi.net/http-status-406-not-acceptable/) |
+| [http-status-207-multi-status-example](http-status-207-multi-status-example/) | [HTTP 207 Multi-Status](https://restfulapi.net/http-status-207-multi-status/) |

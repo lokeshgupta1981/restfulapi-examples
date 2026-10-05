@@ -1,0 +1,201 @@
+### curl: no token
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer realm="shipments-api", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+content-length: 37
+content-type: application/json
+vary: Origin
+
+{"status":401,"error":"unauthorized"}
+### curl: expired token
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer realm="shipments-api", error="invalid_token", error_description="The access token expired", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+content-length: 74
+content-type: application/json
+vary: Origin
+
+{"status":401,"error":"invalid_token","detail":"The access token expired"}
+### curl: token without the write scope
+HTTP/1.1 403 Forbidden
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer realm="shipments-api", error="insufficient_scope", error_description="Token lacks shipments:write", scope="shipments:write", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+content-length: 82
+content-type: application/json
+vary: Origin
+
+{"status":403,"error":"insufficient_scope","detail":"Token lacks shipments:write"}
+### curl: malformed Bearer credentials
+HTTP/1.1 400 Bad Request
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer realm="shipments-api", error="invalid_request", error_description="Malformed Bearer credentials", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+content-length: 80
+content-type: application/json
+vary: Origin
+
+{"status":400,"error":"invalid_request","detail":"Malformed Bearer credentials"}
+### curl: Basic credentials sent to the Bearer API
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer realm="shipments-api", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+content-length: 37
+content-type: application/json
+vary: Origin
+
+{"status":401,"error":"unauthorized"}
+### curl: resource metadata
+{"resource":"http://127.0.0.1:9420/shipments","authorization_servers":["https://auth.example.com"],"scopes_supported":["shipments:read","shipments:write"],"bearer_methods_supported":["header"]}
+
+### curl: two challenges on two lines
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+content-length: 37
+content-type: application/json
+www-authenticate: Bearer realm="shipments-api"
+www-authenticate: DPoP algs="ES256 PS256"
+vary: Origin
+
+{"status":401,"error":"unauthorized"}
+### curl: Basic challenge
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Basic realm="legacy-reports", charset="UTF-8"
+content-length: 37
+content-type: application/json
+vary: Origin
+
+{"status":401,"error":"unauthorized"}
+### curl: FastAPI HTTPBearer without a token
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer
+content-length: 30
+content-type: application/json
+vary: Origin
+
+{"detail":"Not authenticated"}
+### curl: CORS preflight and expired token from another origin
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network
+access-control-allow-methods: GET
+access-control-max-age: 600
+access-control-allow-headers: Accept, Accept-Language, Authorization, Content-Language, Content-Type
+access-control-allow-origin: http://127.0.0.1:9421
+content-length: 2
+content-type: text/plain; charset=utf-8
+
+OK
+HTTP/1.1 401 Unauthorized
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Bearer realm="shipments-api", error="invalid_token", error_description="The access token expired", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+content-length: 74
+content-type: application/json
+access-control-expose-headers: WWW-Authenticate
+access-control-allow-origin: http://127.0.0.1:9421
+vary: Origin
+
+{"status":401,"error":"invalid_token","detail":"The access token expired"}
+### curl: proxy without credentials
+HTTP/1.0 407 Proxy Authentication Required
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 12:25:39 GMT
+Proxy-Authenticate: Basic realm="office-proxy"
+Content-Type: text/plain
+Content-Length: 30
+
+Proxy authentication required
+
+### curl: proxy with credentials, origin without credentials
+HTTP/1.0 401 Unauthorized
+Server: BaseHTTP/0.6 Python/3.13.16
+Date: Mon, 05 Oct 2026 12:25:39 GMT
+date: Mon, 05 Oct 2026 12:25:39 GMT
+server: uvicorn
+www-authenticate: Basic realm="legacy-reports", charset="UTF-8"
+content-type: application/json
+vary: Origin
+Content-Length: 37
+
+{"status":401,"error":"unauthorized"}
+### curl: proxy and origin credentials
+{"report":"monthly-shipments","rows":42}
+
+### curl: credentials in the URL
+{"report":"monthly-shipments","rows":42}
+
+### node url_credentials.mjs
+TypeError: Request cannot be constructed from a URL that includes credentials: http://ana:demo-pass-123@127.0.0.1:9420/legacy/reports
+
+### node parse-demo.mjs
+[
+  {
+    "scheme": "basic",
+    "params": {
+      "realm": "simple"
+    },
+    "token68": null
+  },
+  {
+    "scheme": "newauth",
+    "params": {
+      "realm": "apps",
+      "type": "1",
+      "title": "Login to \"apps\""
+    },
+    "token68": null
+  }
+]
+
+### node client.mjs
+GET /shipments -> 401
+  next step: no token sent: get one from the authorization server
+  authorization server from metadata: https://auth.example.com
+GET /shipments -> 401
+  next step: refresh the token once, then retry
+POST /shipments -> 403
+  next step: ask for scope 'shipments:write', do not retry as is
+GET /v2/shipments -> 401
+  schemes offered: bearer and dpop
+  next step: no token sent: get one from the authorization server
+
+### python basic_client.py
+GET /v2/shipments -> 401
+  WWW-Authenticate: Bearer realm="shipments-api", DPoP algs="ES256 PS256"
+GET /legacy/reports -> 401
+  WWW-Authenticate: Basic realm="legacy-reports", charset="UTF-8"
+GET /legacy/reports with HTTPBasicAuth -> 200
+  Authorization sent: Basic YW5hOmRlbW8tcGFzcy0xMjM=
+  body: {'report': 'monthly-shipments', 'rows': 42}
+GET with user:password in the URL -> 200
+
+### python browser_check.py
+== Login dialog
+navigate to /legacy/reports (Basic)                  status 401 | login dialog: basic realm=legacy-reports
+navigate to /shipments (Bearer)                      status 401 | no login dialog
+same-origin fetch /legacy/reports (Basic)            status 401 | login dialog: basic realm=legacy-reports
+same-origin fetch /shipments (Bearer)                status 401 | no login dialog
+cross-origin fetch /legacy/reports (Basic)           status 401 | no login dialog
+== Reading the header from a cross-origin page
+with Access-Control-Expose-Headers:    401 Bearer realm="shipments-api", error="invalid_token", error_description="The access token expired", resource_metadata="http://127.0.0.1:9420/.well-known/oauth-protected-resource/shipments"
+without Access-Control-Expose-Headers: 401 null
+
+### node --test
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 124.615699
