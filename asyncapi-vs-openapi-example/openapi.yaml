@@ -1,0 +1,105 @@
+openapi: 3.1.1
+info:
+  title: Orders API
+  version: 1.0.0
+  description: Create and read orders over HTTP.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:9210
+    description: Local demo server
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create an order
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewOrder"
+      responses:
+        "201":
+          description: Order created. The service also sends an OrderPlaced event.
+          headers:
+            Location:
+              description: URL of the new order.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/order.yaml"
+        "422":
+          description: The request body failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      summary: Read one order
+      tags: [orders]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/order.yaml"
+        "404":
+          description: No order with this ID.
+webhooks:
+  orderStatusChanged:
+    post:
+      operationId: orderStatusChangedWebhook
+      summary: Sent to a partner URL when an order changes status
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusChanged"
+      responses:
+        "204":
+          description: The partner received the event.
+components:
+  schemas:
+    NewOrder:
+      type: object
+      required: [customerId, items, currency]
+      properties:
+        customerId:
+          type: string
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "./schemas/order-item.yaml"
+    OrderStatusChanged:
+      $ref: "./schemas/order-status-changed.yaml"
+    ValidationError:
+      type: object
+      description: FastAPI's default body for HTTP 422.
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+tags:
+  - name: orders
+    description: Order operations

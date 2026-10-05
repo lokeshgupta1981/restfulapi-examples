@@ -1,0 +1,137 @@
+### 1. Caching: the same GET twice, then the same POST search twice
+$ curl -s -i "http://localhost:9121/orders?status=paid"
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 05 Oct 2026 03:50:18 GMT
+Content-Type: application/json
+Content-Length: 161
+Connection: keep-alive
+cache-control: public, max-age=60
+X-Cache-Status: MISS
+
+{"data":[{"id":1001,"customer_email":"ana@example.com","status":"paid","total":49.0},{"id":1004,"customer_email":"li@example.com","status":"paid","total":25.0}]}
+
+$ curl -s -i "http://localhost:9121/orders?status=paid"
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 05 Oct 2026 03:50:18 GMT
+Content-Type: application/json
+Content-Length: 161
+Connection: keep-alive
+cache-control: public, max-age=60
+X-Cache-Status: HIT
+
+{"data":[{"id":1001,"customer_email":"ana@example.com","status":"paid","total":49.0},{"id":1004,"customer_email":"li@example.com","status":"paid","total":25.0}]}
+
+$ curl -s -i -X POST http://localhost:9121/orders/search -H "Content-Type: application/json" -d '{"status": ["paid"]}'
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 05 Oct 2026 03:50:18 GMT
+Content-Type: application/json
+Content-Length: 161
+Connection: keep-alive
+
+{"data":[{"id":1001,"customer_email":"ana@example.com","status":"paid","total":49.0},{"id":1004,"customer_email":"li@example.com","status":"paid","total":25.0}]}
+
+$ curl -s -i -X POST http://localhost:9121/orders/search -H "Content-Type: application/json" -d '{"status": ["paid"]}'
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 05 Oct 2026 03:50:18 GMT
+Content-Type: application/json
+Content-Length: 161
+Connection: keep-alive
+
+{"data":[{"id":1001,"customer_email":"ana@example.com","status":"paid","total":49.0},{"id":1004,"customer_email":"li@example.com","status":"paid","total":25.0}]}
+
+$ curl -s http://localhost:9120/stats
+{"GET /orders":1,"GET /stats":1,"POST /orders/search":2}
+
+### 2. Logging: a filter in the URL and the same filter in a POST body
+$ curl -s -o /dev/null "http://localhost:9121/orders?customer_email=ana@example.com"
+
+
+$ curl -s -o /dev/null -X POST http://localhost:9121/orders/search -H "Content-Type: application/json" -d '{"customer_email": "ana@example.com"}'
+
+
+$ tail -2 nginx/logs/access.log
+127.0.0.1 - - [05/Oct/2026:03:50:18 +0000] "GET /orders?customer_email=ana@example.com HTTP/1.1" 200 165 "-" "curl/8.5.0"
+127.0.0.1 - - [05/Oct/2026:03:50:18 +0000] "POST /orders/search HTTP/1.1" 200 165 "-" "curl/8.5.0"
+
+
+### 3. Idempotency: the same POST twice creates two orders
+$ curl -s -i -X POST http://localhost:9120/orders -H "Content-Type: application/json" -d '{"customer_email": "kim@example.com", "total": 30}'
+HTTP/1.1 201 Created
+date: Mon, 05 Oct 2026 03:50:18 GMT
+server: uvicorn
+content-length: 78
+content-type: application/json
+location: /orders/1005
+
+{"id":1005,"customer_email":"kim@example.com","status":"pending","total":30.0}
+
+$ curl -s -i -X POST http://localhost:9120/orders -H "Content-Type: application/json" -d '{"customer_email": "kim@example.com", "total": 30}'
+HTTP/1.1 201 Created
+date: Mon, 05 Oct 2026 03:50:18 GMT
+server: uvicorn
+content-length: 78
+content-type: application/json
+location: /orders/1006
+
+{"id":1006,"customer_email":"kim@example.com","status":"pending","total":30.0}
+
+### 4. Proxy retry: the first upstream server drops the connection
+$ curl -s -i "http://localhost:9121/pool/orders?status=paid"
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 05 Oct 2026 03:50:18 GMT
+Content-Type: application/json
+Content-Length: 161
+Connection: keep-alive
+cache-control: public, max-age=60
+
+{"data":[{"id":1001,"customer_email":"ana@example.com","status":"paid","total":49.0},{"id":1004,"customer_email":"li@example.com","status":"paid","total":25.0}]}
+
+$ curl -s -i -X POST http://localhost:9121/pool/orders -H "Content-Type: application/json" -d '{"customer_email": "kim@example.com", "total": 30}'
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 05 Oct 2026 03:50:18 GMT
+Content-Type: text/html
+Content-Length: 166
+Connection: keep-alive
+
+<html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx/1.24.0 (Ubuntu)</center>
+</body>
+</html>
+
+
+$ tail -2 nginx/logs/error.log
+2026/10/05 03:50:18 [error] 24208#24208: *12 upstream prematurely closed connection while reading response header from upstream, client: 127.0.0.1, server: , request: "GET /pool/orders?status=paid HTTP/1.1", upstream: "http://127.0.0.1:9122/orders?status=paid", host: "localhost:9121"
+2026/10/05 03:50:18 [error] 24208#24208: *15 upstream prematurely closed connection while reading response header from upstream, client: 127.0.0.1, server: , request: "POST /pool/orders HTTP/1.1", upstream: "http://127.0.0.1:9122/orders", host: "localhost:9121"
+
+
+$ curl -s http://localhost:9120/stats
+{"GET /orders":3,"GET /stats":2,"POST /orders":2,"POST /orders/search":3}
+
+### 5. Client retry with urllib3
+$ python retry_client.py
+retried methods: ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT', 'TRACE']
+GET  /unstable -> 503
+POST /unstable -> 503
+attempts that reached the app: {'GET /unstable': 3, 'POST /unstable': 1}
+
+### 6. fetch() and a GET body
+$ node get_body.mjs
+TypeError: Request with GET/HEAD method cannot have body.
+200 {"data":[{"id":1001,"customer_email":"ana@example.com","status":"paid","total":49.0},{"id":1004,"customer_email":"li@example.com","status":"paid","total":25.0}]}
+
+### 7. CSRF with a SameSite=Lax cookie
+$ python csrf_demo.py
+browser: 153.0.8010.12
+cookie: [('session', 'Lax')]
+{'method': 'GET', 'order': 1001, 'cookie_sent': True, 'status': 200}
+{'method': 'GET', 'order': 1002, 'cookie_sent': False, 'status': 401}
+{'method': 'POST', 'order': 1003, 'cookie_sent': False, 'status': 401}

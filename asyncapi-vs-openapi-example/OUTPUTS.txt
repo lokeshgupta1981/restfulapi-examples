@@ -1,0 +1,51 @@
+### ./check.sh
+== redocly lint openapi.yaml
+validating openapi.yaml...
+openapi.yaml: validated in 47ms
+
+Woohoo! Your API description is valid. 🎉
+
+== asyncapi validate asyncapi.yaml
+
+File asyncapi.yaml is valid! File asyncapi.yaml and referenced documents don't have governance issues.
+
+== asyncapi validate asyncapi-broken.yaml
+
+File asyncapi-broken.yaml and/or referenced documents have governance issues.
+Errors 
+asyncapi-broken.yaml
+  43:9  error  asyncapi3-operation-messages-from-referred-channel  Operation message does not belong to the specified channel.                                               operations.sendOrderPlaced.messages[0]
+ 59:13  error  asyncapi-document-resolved                          "action" property must be equal to one of the allowed values: "send", "receive". Did you mean "receive"?  operations.receivePaymentCompleted.action
+
+✖ 2 problems (2 errors, 0 warnings, 0 infos, 0 hints)
+
+
+### ./demo.sh
+== POST /orders
+HTTP/1.1 201 Created
+date: Mon, 05 Oct 2026 04:37:57 GMT
+server: uvicorn
+content-length: 190
+content-type: application/json
+location: /orders/ord_a04ac593
+
+{"id":"ord_a04ac593","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":"49.90","currency":"EUR","status":"pending","createdAt":"2026-10-05T04:37:58Z"}
+== POST /orders with an empty items array
+HTTP/1.1 422 Unprocessable Content
+content-length: 193
+content-type: application/json
+
+{"detail":[{"type":"too_short","loc":["body","items"],"msg":"List should have at least 1 item after validation, not 0","input":[],"ctx":{"field_type":"List","min_length":1,"actual_length":0}}]}
+
+== payment event for ord_a04ac593
+== GET /orders/ord_a04ac593
+{"id":"ord_a04ac593","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":"49.90","currency":"EUR","status":"paid","createdAt":"2026-10-05T04:37:58Z"}
+== a bad OrderPlaced event from another producer
+== app log
+[orders] sent orders/placed
+[orders] sent orders/ord_a04ac593/status
+== shipping log
+[shipping] listening
+[shipping] valid OrderPlaced on orders/placed
+[shipping] valid OrderStatusChanged on orders/ord_a04ac593/status
+[shipping] REJECTED orders/placed as OrderPlaced: ["order/status: 'new' is not one of ['pending', 'paid', 'shipped', 'cancelled']", "order/total: 49.9 is not of type 'string'"]

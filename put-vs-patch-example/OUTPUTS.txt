@@ -1,0 +1,204 @@
+$ ./put.sh
+
+### 1. GET the ticket
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:31 GMT
+server: uvicorn
+etag: "1"
+content-length: 112
+content-type: application/json
+
+{"title":"Checkout page times out","status":"open","priority":"normal","assignee":"maria","labels":["checkout"]}
+### 2. PUT the full ticket (change priority to high)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:31 GMT
+server: uvicorn
+etag: "2"
+content-length: 110
+content-type: application/json
+
+{"title":"Checkout page times out","status":"open","priority":"high","assignee":"maria","labels":["checkout"]}
+### 3. PUT the same body again (retry)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:31 GMT
+server: uvicorn
+etag: "2"
+content-length: 110
+content-type: application/json
+
+{"title":"Checkout page times out","status":"open","priority":"high","assignee":"maria","labels":["checkout"]}
+### 4. PUT with only one field
+HTTP/1.1 422 Unprocessable Content
+date: Mon, 05 Oct 2026 03:45:31 GMT
+server: uvicorn
+content-length: 253
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The ticket is not valid.","errors":[{"field":"title","message":"Field required"},{"field":"priority","message":"Field required"},{"field":"labels","message":"Field required"}]}
+### 5. PUT a new ticket at a URL the client chose
+HTTP/1.1 201 Created
+date: Mon, 05 Oct 2026 03:45:31 GMT
+server: uvicorn
+etag: "1"
+location: /tickets/TCK-1002
+content-length: 105
+content-type: application/json
+
+{"title":"Refund email has wrong amount","status":"open","priority":"normal","assignee":"li","labels":[]}
+### 6. PUT from a client that does not know the assignee field
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:31 GMT
+server: uvicorn
+content-length: 112
+content-type: application/json
+
+{"title":"Refund email has wrong amount","status":"in_progress","priority":"normal","assignee":null,"labels":[]}
+$ ./patch.sh
+
+### 1. PATCH with JSON Merge Patch (status only)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+etag: "2"
+content-length: 119
+content-type: application/json
+
+{"title":"Checkout page times out","status":"in_progress","priority":"normal","assignee":"maria","labels":["checkout"]}
+### 2. PATCH with null removes a field
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+etag: "3"
+content-length: 116
+content-type: application/json
+
+{"title":"Checkout page times out","status":"in_progress","priority":"normal","assignee":null,"labels":["checkout"]}
+### 3. PATCH result that breaks validation
+HTTP/1.1 422 Unprocessable Content
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+content-length: 189
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"The ticket is not valid.","errors":[{"field":"priority","message":"Input should be 'low', 'normal' or 'high'"}]}
+### 4. PATCH sent as application/json
+HTTP/1.1 415 Unsupported Media Type
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+accept-patch: application/merge-patch+json, application/json-patch+json
+content-length: 158
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Send the patch as application/merge-patch+json or application/json-patch+json."}
+### 5. OPTIONS
+HTTP/1.1 204 No Content
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+allow: GET, PUT, PATCH, OPTIONS
+accept-patch: application/merge-patch+json, application/json-patch+json
+
+
+### 6. PATCH a ticket that does not exist
+HTTP/1.1 404 Not Found
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+content-length: 86
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"No ticket TCK-9999."}
+### 7. JSON Patch that appends a label, sent twice without If-Match (retry)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+etag: "4"
+content-length: 127
+content-type: application/json
+
+{"title":"Checkout page times out","status":"in_progress","priority":"normal","assignee":null,"labels":["checkout","payments"]}
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+etag: "5"
+content-length: 138
+content-type: application/json
+
+{"title":"Checkout page times out","status":"in_progress","priority":"normal","assignee":null,"labels":["checkout","payments","payments"]}
+
+### 8. JSON Patch that appends a label, sent twice with If-Match (retry)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+etag: "6"
+content-length: 147
+content-type: application/json
+
+{"title":"Checkout page times out","status":"in_progress","priority":"normal","assignee":null,"labels":["checkout","payments","payments","urgent"]}
+HTTP/1.1 412 Precondition Failed
+date: Mon, 05 Oct 2026 03:45:32 GMT
+server: uvicorn
+etag: "6"
+content-length: 119
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"The ticket changed. Current ETag is \"6\"."}
+
+$ ./lost_update.sh
+### Both clients GET the ticket (ETag "1")
+{"title":"Checkout page times out","status":"open","priority":"normal","assignee":"maria","labels":["checkout"]}
+### Client A closes the ticket
+200
+### Client B, still holding the old copy, raises the priority
+200
+### Result
+{"title":"Checkout page times out","status":"open","priority":"high","assignee":"maria","labels":["checkout"]}
+
+$ ./lost_update_patch.sh
+### B. Two merge patches that touch different fields
+{"status": "closed"} -> 200
+{"priority": "high"} -> 200
+{"title":"Checkout page times out","status":"closed","priority":"high","assignee":"maria","labels":["checkout"]}
+### C. Two merge patches that touch the same field
+{"assignee": "li"} -> 200
+{"assignee": "omar"} -> 200
+{"title":"Checkout page times out","status":"closed","priority":"high","assignee":"omar","labels":["checkout"]}
+
+$ ./if_match.sh
+### Both clients GET the ticket
+etag: "1"
+### Client A closes the ticket
+200
+### Client B, still holding the old copy, raises the priority
+HTTP/1.1 412 Precondition Failed
+date: Mon, 05 Oct 2026 03:45:37 GMT
+server: uvicorn
+etag: "2"
+content-length: 119
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"The ticket changed. Current ETag is \"2\"."}
+### Result
+{"title":"Checkout page times out","status":"closed","priority":"normal","assignee":"maria","labels":["checkout"]}
+
+$ python client.py
+attempt 1: GET -> 200, ETag "1"
+other client: PATCH status=closed -> 200, ETag "2"
+attempt 1: PUT If-Match "1" -> 412
+attempt 2: GET -> 200, ETag "2"
+attempt 2: PUT If-Match "2" -> 200
+final: 200, ETag "3"
+{"title": "Checkout page times out", "status": "closed", "priority": "high", "assignee": "maria", "labels": ["checkout"]}
+
+$ REQUIRE_IF_MATCH=true uvicorn app:app --port 9110
+$ curl -si -X PATCH http://localhost:9110/tickets/TCK-1001 -H 'Content-Type: application/merge-patch+json' -d '{"status": "closed"}'
+HTTP/1.1 428 Precondition Required
+date: Mon, 05 Oct 2026 03:45:41 GMT
+server: uvicorn
+content-length: 126
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Precondition Required","status":428,"detail":"Send If-Match with the ETag from your last GET."}
+
+$ python defaults_pitfall.py
+PUT stores:   {'title': '', 'status': 'closed', 'priority': 'normal', 'assignee': None, 'labels': []}
+PATCH changes: {'status': 'closed'}
+PATCH stores: {'title': 'Checkout page times out', 'status': 'closed', 'priority': 'normal', 'assignee': 'maria', 'labels': ['checkout']}

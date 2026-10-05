@@ -1,0 +1,6 @@
+fastapi==0.142.2
+uvicorn==0.54.0
+aiomqtt==2.5.1
+amqtt==0.12.1
+jsonschema==4.26.0
+PyYAML==6.0.3

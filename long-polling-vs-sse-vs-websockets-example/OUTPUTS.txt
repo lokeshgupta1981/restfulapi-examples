@@ -1,0 +1,190 @@
+Captured 2026-10-05 on Linux, Python 3.13.16, fastapi 0.142.2, uvicorn 0.54.0, websockets 17.2, httpx 0.28.1, nginx 1.24.0, Chromium 141.0.7390.37.
+
+===== ./demo.sh (fresh server)
+### 1. Publish an event
+HTTP/1.1 201 Created
+date: Mon, 05 Oct 2026 04:08:58 GMT
+server: uvicorn
+content-length: 69
+content-type: application/json
+
+{"id":1,"order_id":"1042","status":"packed","sent_at":1791173338.904}
+
+### 2. Long poll: an event newer than id 0 exists, so the answer comes at once
+{"events":[{"id":1,"order_id":"1042","status":"packed","sent_at":1791173338.904}],"last_id":1}
+(0.001275 s)
+
+### 3. Long poll: nothing newer than id 1, the server holds the request
+{"events":[{"id":2,"order_id":"1042","status":"shipped","sent_at":1791173340.924}],"last_id":2}
+(2.009078 s)
+
+### 4. Long poll: nothing arrives, the server answers after LONG_POLL_WAIT (25 s)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 04:09:00 GMT
+server: uvicorn
+cache-control: no-store
+content-length: 25
+content-type: application/json
+
+{"events":[],"last_id":2}
+(25.001279 s)
+
+### 5. SSE: one response that stays open, starting after id 2 (curl stops after 4 s)
+HTTP/1.1 200 OK
+date: Mon, 05 Oct 2026 04:09:25 GMT
+server: uvicorn
+cache-control: no-store
+x-accel-buffering: no
+content-type: text/event-stream; charset=utf-8
+transfer-encoding: chunked
+
+retry: 3000
+
+id: 3
+event: status
+data: {"id": 3, "order_id": "1042", "status": "out_for_delivery", "sent_at": 1791173367.943}
+
+
+### 6. SSE: reconnect with Last-Event-ID: 2
+retry: 3000
+
+id: 3
+event: status
+data: {"id": 3, "order_id": "1042", "status": "out_for_delivery", "sent_at": 1791173367.943}
+
+
+### 7. WebSocket opening handshake (curl prints the HTTP 101 and stops)
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+date: Mon, 05 Oct 2026 04:09:31 GMT
+server: uvicorn
+
+### 8. WebSocket: messages in both directions on one connection
+< {"id": 3, "order_id": "1042", "status": "out_for_delivery", "sent_at": 1791173367.943}
+> {"action": "cancel"}
+< {"id": 4, "order_id": "1042", "status": "cancel_requested", "sent_at": 1791173373.062}
+
+===== measure.py runs
+$ NETWORK_DELAY_MS=0 python measure.py 20 0.5
+20 events, one every 500 ms, network delay 0 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20     2.1     2.8        20        5140      3595
+SSE                  20     1.6     2.2         0        2440         0
+WebSocket            20     1.4     2.1         0        1785         0
+
+$ NETWORK_DELAY_MS=50 python measure.py 20 0.5
+20 events, one every 500 ms, network delay 50 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20    52.6    53.6        20        5149      3600
+SSE                  20    51.8    53.1         0        2449         0
+WebSocket            20    51.6    53.0         0        1789         0
+
+$ NETWORK_DELAY_MS=50 python measure.py 20 0.02
+20 events, one every 20 ms, network delay 50 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20   100.8   149.7         6        2686      1080
+SSE                  20    52.1    52.8         0        2450         0
+WebSocket            20    51.9    52.7         0        1790         0
+
+$ WS_DEFLATE=1 python measure.py 20 0.5
+20 events, one every 500 ms, network delay 0 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20     2.1     3.1        20        5147      3600
+SSE                  20     1.5     2.8         0        2447         0
+WebSocket            20     1.4     2.4         0         423         0
+
+$ python measure.py 20 0.5 60
+20 events, one every 500 ms, network delay 0 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20     2.3     5.1        20        5160      3605
+SSE                  20     1.6     3.1         0        2460         0
+WebSocket            20     1.4     2.7         0        1795         0
+
+Idle for 60 s with no events
+technique       requests  bytes down  bytes up
+long polling           2         354       362
+SSE                    0          65         0
+WebSocket              0          36        60
+
+===== Browser: index.html opened through nginx (port 9151) in headless Chromium.
+Steps: publish packed, shipped; POST /admin/drop-connections; publish out_for_delivery;
+nginx reloaded with 'location ~ /stream$ { return 502; }'; POST /admin/drop-connections; publish delivered;
+nginx config restored; click Cancel over WebSocket.
+step 1: publish packed, shipped
+step 2: drop-connections -> 204 ; publish out_for_delivery
+step 3: nginx answers /stream with HTTP 502; drop-connections; publish delivered
+nginx config restored
+step 4: click Cancel over WebSocket
+browser opened WebSocket /orders/1042/socket?after=0
+browser got 200 for /orders/1042/stream?after=0
+browser opened WebSocket /orders/1042/socket?after=2
+browser got 200 for /orders/1042/stream?after=0
+browser opened WebSocket /orders/1042/socket?after=3
+browser got 502 for /orders/1042/stream?after=0
+browser got 200 for /orders/1042/stream?after=3
+== lp
+#1 packed
+#2 shipped
+#3 out_for_delivery
+#4 delivered
+#5 cancel_requested
+
+== sse
+#1 packed
+#2 shipped
+connection lost, readyState=0
+#3 out_for_delivery
+connection lost, readyState=0
+connection lost, readyState=2
+#4 delivered
+#5 cancel_requested
+
+== ws
+#1 packed
+#2 shipped
+closed with code 1012, reconnect in 1000 ms
+#3 out_for_delivery
+closed with code 1012, reconnect in 1000 ms
+#4 delivered
+#5 cancel_requested
+
+SSE connect order=1042 Last-Event-ID=None start_after=0
+SSE connect order=1042 Last-Event-ID=2 start_after=2
+SSE connect order=1042 Last-Event-ID=None start_after=3
+
+===== Browser connection limit: 8 EventSource objects on one origin, then one fetch()
+Chromium 141.0.7390.37
+http://127.0.0.1:9150 (http/1.1): 8 EventSource objects, open: 6, readyState: [1, 1, 1, 1, 1, 1, 0, 0], extra fetch: still waiting after 4000 ms (aborted)
+https://127.0.0.1:9155 (h2): 8 EventSource objects, open: 8, readyState: [1, 1, 1, 1, 1, 1, 1, 1], extra fetch: HTTP 200 after 4 ms
+
+===== SSE through nginx (port 9151) with gzip on for text/event-stream and default proxy_buffering on
+== server started with SSE_NO_BUFFER_HEADER=0
+$ curl -s -N http://127.0.0.1:9151/orders/plain0/stream
+ 0.05 s  retry: 3000
+ 1.01 s  id: 1
+ 1.02 s  event: status
+ 1.02 s  data: {"id": 1, "order_id": "plain0", "status": "packed", "sent_at": 1791173302.256}
+[curl stopped at 5 s]
+
+== server started with SSE_NO_BUFFER_HEADER=0
+$ curl -s -N --compressed http://127.0.0.1:9151/orders/gzip0/stream
+[curl stopped at 5 s]
+
+== server started with SSE_NO_BUFFER_HEADER=1
+$ curl -s -N --compressed http://127.0.0.1:9151/orders/gzip1/stream
+ 0.03 s  retry: 3000
+ 1.01 s  id: 1
+ 1.02 s  event: status
+ 1.02 s  data: {"id": 1, "order_id": "gzip1", "status": "packed", "sent_at": 1791173317.286}
+[curl stopped at 5 s]
+
+===== Idle WebSocket through nginx with default proxy_read_timeout 60s
+uvicorn --ws-ping-interval 0:
+ws://127.0.0.1:9151/orders/idle/socket: closed after 60.1 s, close code None (no close frame received: True)
+uvicorn default (ping every 20 s):
+ws://127.0.0.1:9151/orders/idle2/socket: still open after 75.0 s (server sends a ping every 20 s)
+
+===== Sample nginx-proxy.conf (port changed to 9156, self-signed cert, gzip on in http block)
+SSE, long poll and wss all returned event 1 through it.

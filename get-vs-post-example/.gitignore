@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+nginx/logs/
+nginx/temp/
+nginx/cache/
+nginx/nginx.pid
+.pids

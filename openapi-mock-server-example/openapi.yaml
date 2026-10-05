@@ -1,0 +1,215 @@
+openapi: 3.1.2
+info:
+  title: Orders API
+  version: 1.0.0
+  description: Small Orders API used to compare OpenAPI mock servers.
+servers:
+  - url: http://127.0.0.1:9220
+    description: Prism mock
+paths:
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List orders
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+      responses:
+        '200':
+          description: A list of orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                additionalProperties: false
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+              examples:
+                twoOrders:
+                  value:
+                    items:
+                      - id: ord_1001
+                        status: pending
+                        currency: USD
+                        total: '59.90'
+                        items:
+                          - sku: BOOK-REST-101
+                            quantity: 2
+                      - id: ord_1000
+                        status: shipped
+                        currency: USD
+                        total: '24.50'
+                        items:
+                          - sku: MUG-API-01
+                            quantity: 1
+    post:
+      operationId: createOrder
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOrder'
+            examples:
+              oneBook:
+                value:
+                  currency: USD
+                  items:
+                    - sku: BOOK-REST-101
+                      quantity: 1
+      responses:
+        '201':
+          description: The order was created.
+          headers:
+            Location:
+              description: URL of the new order.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              examples:
+                oneBook:
+                  value:
+                    id: ord_1002
+                    status: pending
+                    currency: USD
+                    total: '29.95'
+                    items:
+                      - sku: BOOK-REST-101
+                        quantity: 1
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+  /orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^ord_[0-9]+$'
+    get:
+      operationId: getOrder
+      summary: Get one order
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              examples:
+                pending:
+                  value:
+                    id: ord_1001
+                    status: pending
+                    currency: USD
+                    total: '59.90'
+                    items:
+                      - sku: BOOK-REST-101
+                        quantity: 2
+                shipped:
+                  value:
+                    id: ord_1000
+                    status: shipped
+                    currency: USD
+                    total: '24.50'
+                    items:
+                      - sku: MUG-API-01
+                        quantity: 1
+        '404':
+          description: No order with this ID.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notFound:
+                  value:
+                    type: https://api.example.com/problems/order-not-found
+                    title: Order not found
+                    status: 404
+components:
+  responses:
+    ValidationFailed:
+      description: The body is valid JSON but breaks a rule.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            badQuantity:
+              value:
+                type: https://api.example.com/problems/validation
+                title: Validation failed
+                status: 422
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [pending, paid, shipped, cancelled]
+    OrderItem:
+      type: object
+      required: [sku, quantity]
+      additionalProperties: false
+      properties:
+        sku:
+          type: string
+          pattern: '^[A-Z]+-[A-Z]+-[0-9]+$'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+    NewOrder:
+      type: object
+      required: [currency, items]
+      additionalProperties: false
+      properties:
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    Order:
+      type: object
+      required: [id, status, currency, total, items]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: '^ord_[0-9]+$'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        total:
+          type: string
+          pattern: '^[0-9]{1,4}\.[0-9]{2}$'
+        items:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer

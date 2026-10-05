@@ -1,0 +1,77 @@
+asyncapi: 3.1.0
+info:
+  title: Orders Service Events
+  version: 1.0.0
+  description: Events that the Orders service sends and receives on the MQTT broker.
+  license:
+    name: MIT
+defaultContentType: application/json
+servers:
+  local:
+    host: localhost:9211
+    protocol: mqtt
+    protocolVersion: 3.1.1
+    description: Local demo broker
+channels:
+  orderPlaced:
+    address: orders/placed
+    messages:
+      orderPlaced:
+        $ref: "#/components/messages/OrderPlaced"
+  orderStatus:
+    address: orders/{orderId}/status
+    parameters:
+      orderId:
+        description: ID of the order whose status changed.
+    messages:
+      orderStatusChanged:
+        $ref: "#/components/messages/OrderStatusChanged"
+  paymentCompleted:
+    address: payments/{orderId}/completed
+    parameters:
+      orderId:
+        description: ID of the paid order.
+    messages:
+      paymentCompleted:
+        $ref: "#/components/messages/PaymentCompleted"
+operations:
+  sendOrderPlaced:
+    action: send
+    channel:
+      $ref: "#/channels/orderPlaced"
+    summary: Sent after POST /orders stores a new order.
+    bindings:
+      mqtt:
+        qos: 1
+        bindingVersion: 0.2.0
+  sendOrderStatusChanged:
+    action: send
+    channel:
+      $ref: "#/channels/orderStatus"
+    summary: Sent every time an order changes status.
+    bindings:
+      mqtt:
+        qos: 1
+        bindingVersion: 0.2.0
+  receivePaymentCompleted:
+    action: receive
+    channel:
+      $ref: "#/channels/paymentCompleted"
+    summary: The service marks the order as paid.
+components:
+  messages:
+    OrderPlaced:
+      name: OrderPlaced
+      title: Order placed
+      payload:
+        $ref: "./schemas/order-placed.yaml"
+    OrderStatusChanged:
+      name: OrderStatusChanged
+      title: Order status changed
+      payload:
+        $ref: "./schemas/order-status-changed.yaml"
+    PaymentCompleted:
+      name: PaymentCompleted
+      title: Payment completed
+      payload:
+        $ref: "./schemas/payment-completed.yaml"

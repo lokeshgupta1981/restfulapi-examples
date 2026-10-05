@@ -1,0 +1,98 @@
+Express app on http://127.0.0.1:9183
+== 1. GET the invoice PDF without following the redirect
+HTTP/1.1 302 Found
+date: Mon, 05 Oct 2026 04:24:45 GMT
+server: uvicorn
+content-length: 0
+location: /storage/invoices/1001.pdf?expires=1791200000&sig=3f9a1c
+cache-control: no-store
+
+
+== 2. Follow the redirect with curl -L
+$ curl -sL -o invoice-1001.pdf -w 'status: %{http_code}, type: %{content_type}, redirects: %{num_redirects}\nfinal URL: %{url_effective}\n' http://127.0.0.1:9182/invoices/1001/pdf
+status: 200, type: application/pdf, redirects: 1
+final URL: http://127.0.0.1:9182/storage/invoices/1001.pdf?expires=1791200000&sig=3f9a1c
+
+== 3. Express res.redirect() default
+HTTP/1.1 302 Found
+X-Powered-By: Express
+Cache-Control: no-store
+Location: /storage/invoices/1001.pdf?expires=1791200000&sig=3f9a1c
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+
+== 4. curl -L with POST, PUT and DELETE (same host, with an Authorization header)
+$ curl -sL -H 'Authorization: Bearer demo-token' -H 'Content-Type: application/json' -d '{"amount":"49.90"}' http://127.0.0.1:9182/redirect/302
+{"method":"GET","body_bytes":0,"authorization":true}
+$ curl -sL -X PUT -H 'Authorization: Bearer demo-token' -H 'Content-Type: application/json' -d '{"amount":"49.90"}' http://127.0.0.1:9182/redirect/302
+{"method":"PUT","body_bytes":0,"authorization":true}
+$ curl -sL -X DELETE -H 'Authorization: Bearer demo-token' -H 'Content-Type: application/json' -d '{"amount":"49.90"}' http://127.0.0.1:9182/redirect/302
+{"method":"DELETE","body_bytes":0,"authorization":true}
+-- the same with HTTP 303 and HTTP 307
+POST 303 {"method":"GET","body_bytes":0,"authorization":false}
+PUT 303 {"method":"PUT","body_bytes":0,"authorization":false}
+DELETE 303 {"method":"DELETE","body_bytes":0,"authorization":false}
+POST 307 {"method":"POST","body_bytes":18,"authorization":false}
+PUT 307 {"method":"PUT","body_bytes":18,"authorization":false}
+DELETE 307 {"method":"DELETE","body_bytes":18,"authorization":false}
+-- POST with --post302
+{"method":"POST","body_bytes":18,"authorization":false}
+-- verbose POST to 302
+> POST /redirect/302 HTTP/1.1
+< HTTP/1.1 302 Found
+* Switch from POST to GET
+> GET /echo HTTP/1.1
+< HTTP/1.1 200 OK
+
+== 5. Python requests and httpx
+requests 2.34.2, httpx 0.28.1
+sent    status  requests            httpx               
+POST    302     GET body=0          GET body=0          
+PUT     302     GET body=0          GET body=0          
+DELETE  302     GET body=0          GET body=0          
+POST    303     GET body=0          GET body=0          
+PUT     303     GET body=0          GET body=0          
+DELETE  303     GET body=0          GET body=0          
+POST    307     POST body=19        POST body=18        
+PUT     307     PUT body=19         PUT body=18         
+DELETE  307     DELETE body=19      DELETE body=18      
+requests Authorization kept: same host=True, other host=False
+httpx Authorization kept: same host=True, other host=False
+
+== 6. Node.js fetch()
+Node.js v22.22.0 fetch()
+POST    302     GET body=0
+PUT     302     PUT body=18
+DELETE  302     DELETE body=18
+POST    303     GET body=0
+PUT     303     GET body=0
+DELETE  303     GET body=0
+POST    307     POST body=18
+PUT     307     PUT body=18
+DELETE  307     DELETE body=18
+
+== 7. Java HttpClient
+Java 21.0.12.1 HttpClient, Redirect.NORMAL
+POST    302     {"method":"GET","body_bytes":0,"authorization":false}
+PUT     302     {"method":"PUT","body_bytes":18,"authorization":false}
+DELETE  302     {"method":"DELETE","body_bytes":18,"authorization":false}
+POST    303     {"method":"GET","body_bytes":0,"authorization":false}
+PUT     303     {"method":"GET","body_bytes":0,"authorization":false}
+DELETE  303     {"method":"GET","body_bytes":0,"authorization":false}
+POST    307     {"method":"POST","body_bytes":18,"authorization":false}
+PUT     307     {"method":"PUT","body_bytes":18,"authorization":false}
+DELETE  307     {"method":"DELETE","body_bytes":18,"authorization":false}
+
+== 8. Redirect following turned off
+requests: 302 /echo
+fetch(): 302 /echo
+
+== 9. pytest
+..                                                                       [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+  .venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2 passed, 1 warning in 0.29s

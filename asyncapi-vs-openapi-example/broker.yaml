@@ -1,0 +1,7 @@
+listeners:
+  default:
+    type: tcp
+    bind: 127.0.0.1:9211
+plugins:
+  amqtt.plugins.authentication.AnonymousAuthPlugin:
+    allow_anonymous: true

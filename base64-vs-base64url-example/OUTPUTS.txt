@@ -1,0 +1,428 @@
+# Captured 2026-10-05T03:04Z
+
+$ python3 python/encoding_demo.py
+1. Same 7 bytes, two alphabets
+   input           : b'<<???>>'
+   base64          : PDw/Pz8+Pg==
+   base64url       : PDw_Pz8-Pg==
+   base64url no pad: PDw_Pz8-Pg
+
+2. Padding by input length
+   1 byte(s) b'a'     -> YQ==
+   2 byte(s) b'ab'    -> YWI=
+   3 byte(s) b'abc'   -> YWJj
+   4 byte(s) b'abcd'  -> YWJjZA==
+
+3. Encoded size
+           3 bytes -> base64         4 chars, base64url no pad         4 chars (+33.3%)
+         100 bytes -> base64       136 chars, base64url no pad       134 chars (+36.0%)
+        1024 bytes -> base64      1368 chars, base64url no pad      1366 chars (+33.6%)
+     1000000 bytes -> base64   1333336 chars, base64url no pad   1333334 chars (+33.3%)
+
+4. urlsafe_b64decode() and missing padding
+   urlsafe_b64decode('PDw_Pz8-Pg') -> Error Incorrect padding
+   b64url_decode('PDw_Pz8-Pg')     -> b'<<???>>'
+
+5. Decoding base64url text with the standard decoder
+   original bytes        : fb ff bf 01 02 03
+   base64url text        : -_-_AQID
+   b64decode(text)       : 01 02 03 (no error!)
+   b64decode(validate=True) -> Error Only base64 data is allowed
+
+6. JWT segments
+   token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTQyIiwic2NvcGUiOiJvcmRlcnM6cmVhZCIsImV4cCI6MTc5MTAwMDAwMH0.EcSCm3afKtt2EFgxG5I7bK6M9xckk_klxNtEmd0R9w0
+   payload segment length: 75 (length % 4 = 3)
+   b64decode(payload)    -> Error Incorrect padding
+   b64url_decode(payload)-> {"sub":"user-42","scope":"orders:read","exp":1791000000}
+   signature bytes             : 32
+
+$ ./demo.sh   (server: python3 python/api_server.py on 127.0.0.1:9170)
+
+### 1. Base64URL cursor: first page, then the next page
+{
+  "items": [
+    {
+      "id": "ord_1000",
+      "total": "26.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1001",
+      "total": "20.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAxIn0u-sCjW-KiNWI"
+}
+{
+  "items": [
+    {
+      "id": "ord_1002",
+      "total": "21.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1003",
+      "total": "22.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAzIn0uC-jEVMMKlgw"
+}
+
+### 2. Standard Base64 cursor pasted into the query string
+next_cursor: eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI=
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Invalid cursor 'eyJhZnRlciI6Im9yZF8xMDAxIn0u sCjW KiNWI=': Only base64 data is allowed"
+}
+--- same cursor, percent-encoded with --data-urlencode:
+{
+  "items": [
+    {
+      "id": "ord_1002",
+      "total": "21.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1003",
+      "total": "22.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAzIn0uC+jEVMMKlgw="
+}
+### 3. File content in JSON: standard Base64 on one line
+HTTP/1.1 201 Created
+Server: OrdersAPI/1.0
+Date: Mon, 05 Oct 2026 03:04:45 GMT
+Content-Type: application/json
+Content-Digest: sha-256=:n1Ojk+Uo/b4SJ01DIj7INID5HznEnJxpNE7xsmrRGWs=:
+Content-Length: 74
+
+{
+  "id": "att_n1Ojk-Uo",
+  "file_name": "pixel.png",
+  "size_bytes": 70
+}
+--- Base64URL text instead:
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "content_base64 must be standard Base64 (RFC 4648, section 4): Only base64 data is allowed"
+}
+--- base64 without -w 0 (line break after 76 characters):
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "content_base64 must be standard Base64 (RFC 4648, section 4): Only base64 data is allowed"
+}
+--- sha256 of the file, in Base64, for comparison:
+n1Ojk+Uo/b4SJ01DIj7INID5HznEnJxpNE7xsmrRGWs=
+
+### 4. Basic authentication
+{
+  "report": "daily-sales",
+  "orders": 6
+}
+--- header built with echo (adds a newline):
+echo | base64       : cmVwb3J0cy1hcHA6czNjcmV0LTQyCg==
+printf '%s' | base64: cmVwb3J0cy1hcHA6czNjcmV0LTQy
+HTTP/1.1 401 Unauthorized
+Server: OrdersAPI/1.0
+Date: Mon, 05 Oct 2026 03:04:45 GMT
+Content-Type: application/problem+json
+WWW-Authenticate: Basic realm="reports", charset="UTF-8"
+Content-Length: 109
+
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Wrong user or password"
+}
+0000000   r   e   p   o   r   t   s   -   a   p   p   :   s   3   c   r
+0000020   e   t   -   4   2  \n
+
+### 5. Command line: base64url with GNU basenc
+PDw_Pz8-Pg==
+<<???>>basenc: invalid input
+ (exit code 1)
+<<???>> (exit code 0)
+PDw_Pz8-Pg
+
+$ node node/demo.mjs   (Node.js 22.22.0)
+1. Buffer
+   base64     : PDw/Pz8+Pg==
+   base64url  : PDw_Pz8-Pg
+   decode url : <<???>>
+   'base64' decoder on url text: <<???>>
+   'base64url' decoder on 'PDw*Pz8-Pg': <Buffer 3c 3c 0f cf cf 8f>
+
+2. atob() and btoa() (browsers and Node.js)
+   atob('PDw/Pz8+Pg') : <<???>>
+   atob('PDw/Pz8+Pg==') with padding: <<???>>
+   atob('PDw_Pz8-Pg') -> InvalidCharacterError: Invalid character
+   btoa('Caf\u00e9 \u20ac5') -> InvalidCharacterError: Invalid character
+
+3. Uint8Array.toBase64() / fromBase64()
+   not available in Node.js v22.22.0 (needs Node.js 25 or later)
+
+$ node node/demo.mjs   (Node.js 26.10.0)
+1. Buffer
+   base64     : PDw/Pz8+Pg==
+   base64url  : PDw_Pz8-Pg
+   decode url : <<???>>
+   'base64' decoder on url text: <<???>>
+   'base64url' decoder on 'PDw*Pz8-Pg': <Buffer 3c 3c 0f cf cf 8f>
+
+2. atob() and btoa() (browsers and Node.js)
+   atob('PDw/Pz8+Pg') : <<???>>
+   atob('PDw/Pz8+Pg==') with padding: <<???>>
+   atob('PDw_Pz8-Pg') -> InvalidCharacterError: Invalid character
+   btoa('Caf\u00e9 \u20ac5') -> InvalidCharacterError: Invalid character
+
+3. Uint8Array.toBase64() / fromBase64()
+   toBase64()                    : PDw/Pz8+Pg==
+   toBase64({alphabet:'base64url', omitPadding:true}): PDw_Pz8-Pg
+   fromBase64('PDw_Pz8-Pg', {alphabet:'base64url'}): <<???>>
+   fromBase64('PDw_Pz8-Pg') -> SyntaxError: Found a character that cannot be part of a valid base64 string.
+
+$ java java/Base64Demo.java   (OpenJDK 21.0.12)
+base64          : PDw/Pz8+Pg==
+base64url       : PDw_Pz8-Pg==
+base64url no pad: PDw_Pz8-Pg
+url decoder, no padding: <<???>>
+basic decoder on url text: Illegal base64 character 5f
+MIME encoder, 60 bytes -> contains CRLF: true
+
+$ go run .   (Go 1.24.7)
+StdEncoding    : PDw/Pz8+Pg==
+URLEncoding    : PDw_Pz8-Pg==
+RawURLEncoding : PDw_Pz8-Pg
+RawURLEncoding.DecodeString("PDw_Pz8-Pg")   -> "<<???>>", err=<nil>
+URLEncoding.DecodeString("PDw_Pz8-Pg")      -> err = illegal base64 data at input byte 8
+RawURLEncoding.DecodeString("PDw_Pz8-Pg==") -> err = illegal base64 data at input byte 10
+StdEncoding.DecodeString("PDw_Pz8-Pg==")    -> err = illegal base64 data at input byte 3
+
+$ python3 decoder-matrix/decoder_matrix.py
+b64decode | std padded=ok(b'<<???>>') std no pad=ERR url padded=ok(b'<<\x0f\xcf\xc3\xe0') url no pad=ok(b'<<\x0f\xcf\xc3\xe0') bad char=ERR
+b64decode validate | std padded=ok(b'<<???>>') std no pad=ERR url padded=ERR url no pad=ERR bad char=ERR
+urlsafe_b64decode | std padded=ok(b'<<???>>') std no pad=ERR url padded=ok(b'<<???>>') url no pad=ERR bad char=ERR
+
+$ node decoder-matrix/decoder_matrix.mjs   (Node.js 26.10.0)
+Buffer base64 | std padded=ok("<<???>>") std no pad=ok("<<???>>") url padded=ok("<<???>>") url no pad=ok("<<???>>") bad char=ok("<<\u000fÏÏ")
+Buffer base64url | std padded=ok("<<???>>") std no pad=ok("<<???>>") url padded=ok("<<???>>") url no pad=ok("<<???>>") bad char=ok("<<\u000fÏÏ")
+atob | std padded=ok("<<???>>") std no pad=ok("<<???>>") url padded=ERR url no pad=ERR bad char=ERR
+fromBase64 | std padded=ok("<<???>>") std no pad=ok("<<???>>") url padded=ERR url no pad=ERR bad char=ERR
+fromBase64 url | std padded=ERR std no pad=ERR url padded=ok("<<???>>") url no pad=ok("<<???>>") bad char=ERR
+
+$ java decoder-matrix/DecoderMatrix.java
+getDecoder | std padded=ok(<<???>>) std no pad=ok(<<???>>) url padded=ERR url no pad=ERR bad char=ERR
+getUrlDecoder | std padded=ERR std no pad=ERR url padded=ok(<<???>>) url no pad=ok(<<???>>) bad char=ERR
+getMimeDecoder | std padded=ok(<<???>>) std no pad=ok(<<???>>) url padded=ERR url no pad=ok(<<???) bad char=ERR
+
+$ cd decoder-matrix/go && go run .
+StdEncoding | std padded=ok("<<???>>") std no pad=ERR url padded=ERR url no pad=ERR bad char=ERR
+RawStdEncoding | std padded=ERR std no pad=ok("<<???>>") url padded=ERR url no pad=ERR bad char=ERR
+URLEncoding | std padded=ERR std no pad=ERR url padded=ok("<<???>>") url no pad=ERR bad char=ERR
+RawURLEncoding | std padded=ERR std no pad=ERR url padded=ERR url no pad=ok("<<???>>") bad char=ERR
+
+# Single commands used in the article (bash -x trace, server on 127.0.0.1:9170, run from the project folder)
++ curl -s http://127.0.0.1:9170/orders
+{
+  "items": [
+    {
+      "id": "ord_1000",
+      "total": "26.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1001",
+      "total": "20.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAxIn0u-sCjW-KiNWI"
+}+ curl -s 'http://127.0.0.1:9170/orders?cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u-sCjW-KiNWI'
+{
+  "items": [
+    {
+      "id": "ord_1002",
+      "total": "21.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1003",
+      "total": "22.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAzIn0uC-jEVMMKlgw"
+}+ curl -s http://127.0.0.1:9170/legacy/orders
+{
+  "items": [
+    {
+      "id": "ord_1000",
+      "total": "26.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1001",
+      "total": "20.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI="
+}+ curl -s 'http://127.0.0.1:9170/legacy/orders?cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI='
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Invalid cursor 'eyJhZnRlciI6Im9yZF8xMDAxIn0u sCjW KiNWI=': Only base64 data is allowed"
+}+ curl -s -G http://127.0.0.1:9170/legacy/orders --data-urlencode cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI=
+{
+  "items": [
+    {
+      "id": "ord_1002",
+      "total": "21.50",
+      "currency": "EUR"
+    },
+    {
+      "id": "ord_1003",
+      "total": "22.50",
+      "currency": "EUR"
+    }
+  ],
+  "next_cursor": "eyJhZnRlciI6Im9yZF8xMDAzIn0uC+jEVMMKlgw="
+}+ curl -s -G http://127.0.0.1:9170/legacy/orders --data-urlencode cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI= -v
++ grep '^> GET'
+> GET /legacy/orders?cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u%2bsCjW%2bKiNWI%3d HTTP/1.1
++ base64 -w 0 pixel.png
++ jq -R '{file_name: "pixel.png", content_base64: .}'
++ curl -s -i http://127.0.0.1:9170/attachments -H 'Content-Type: application/json' --data-binary @-
+HTTP/1.1 201 Created
+Server: OrdersAPI/1.0
+Date: Mon, 05 Oct 2026 03:08:34 GMT
+Content-Type: application/json
+Content-Digest: sha-256=:n1Ojk+Uo/b4SJ01DIj7INID5HznEnJxpNE7xsmrRGWs=:
+Content-Length: 74
+
+{
+  "id": "att_n1Ojk-Uo",
+  "file_name": "pixel.png",
+  "size_bytes": 70
+}+ base64 -w 0 pixel.png
++ tr +/ -_
++ jq -R '{file_name: "pixel.png", content_base64: .}'
++ curl -s http://127.0.0.1:9170/attachments -H 'Content-Type: application/json' --data-binary @-
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "content_base64 must be standard Base64 (RFC 4648, section 4): Only base64 data is allowed"
+}+ base64 pixel.png
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP438DwHwAGgAJ/EEwb
+4QAAAABJRU5ErkJggg==
++ base64 pixel.png
++ jq -Rs '{file_name: "pixel.png", content_base64: .}'
+{
+  "file_name": "pixel.png",
+  "content_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP438DwHwAGgAJ/EEwb\n4QAAAABJRU5ErkJggg==\n"
+}
++ base64 pixel.png
++ jq -Rs '{file_name: "pixel.png", content_base64: .}'
++ curl -s http://127.0.0.1:9170/attachments -H 'Content-Type: application/json' --data-binary @-
+{
+  "type": "about:blank",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "content_base64 must be standard Base64 (RFC 4648, section 4): Only base64 data is allowed"
+}+ base64
++ openssl dgst -sha256 -binary pixel.png
+n1Ojk+Uo/b4SJ01DIj7INID5HznEnJxpNE7xsmrRGWs=
++ base64
++ echo reports-app:s3cret-42
+cmVwb3J0cy1hcHA6czNjcmV0LTQyCg==
++ printf %s reports-app:s3cret-42
++ base64
+cmVwb3J0cy1hcHA6czNjcmV0LTQy
++ curl -s -i http://127.0.0.1:9170/reports -H 'Authorization: Basic cmVwb3J0cy1hcHA6czNjcmV0LTQyCg=='
+HTTP/1.1 401 Unauthorized
+Server: OrdersAPI/1.0
+Date: Mon, 05 Oct 2026 03:08:34 GMT
+Content-Type: application/problem+json
+WWW-Authenticate: Basic realm="reports", charset="UTF-8"
+Content-Length: 109
+
+{
+  "type": "about:blank",
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Wrong user or password"
+}+ curl -s -i http://127.0.0.1:9170/reports -H 'Authorization: Basic cmVwb3J0cy1hcHA6czNjcmV0LTQy'
+HTTP/1.1 200 OK
+Server: OrdersAPI/1.0
+Date: Mon, 05 Oct 2026 03:08:34 GMT
+Content-Type: application/json
+Content-Length: 44
+
+{
+  "report": "daily-sales",
+  "orders": 6
+}+ curl -s -u reports-app:s3cret-42 -v http://127.0.0.1:9170/reports
++ grep -i '^> authorization'
+> Authorization: Basic cmVwb3J0cy1hcHA6czNjcmV0LTQy
++ echo cmVwb3J0cy1hcHA6czNjcmV0LTQyCg==
++ base64 -d
++ od -c
+0000000   r   e   p   o   r   t   s   -   a   p   p   :   s   3   c   r
+0000020   e   t   -   4   2  \n
+0000026
+
+# Article commands, verbatim (the trace above shows them as bash -x prints them)
+curl -s http://127.0.0.1:9170/orders
+curl -s "http://127.0.0.1:9170/orders?cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u-sCjW-KiNWI"
+curl -s http://127.0.0.1:9170/legacy/orders
+curl -s "http://127.0.0.1:9170/legacy/orders?cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI="
+curl -s -G http://127.0.0.1:9170/legacy/orders --data-urlencode "cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI="
+curl -s -G http://127.0.0.1:9170/legacy/orders --data-urlencode "cursor=eyJhZnRlciI6Im9yZF8xMDAxIn0u+sCjW+KiNWI=" -v 2>&1 | grep "^> GET"
+base64 -w 0 pixel.png | jq -R '{file_name: "pixel.png", content_base64: .}' | curl -s -i http://127.0.0.1:9170/attachments -H "Content-Type: application/json" --data-binary @-
+base64 -w 0 pixel.png | tr '+/' '-_' | jq -R '{file_name: "pixel.png", content_base64: .}' | curl -s http://127.0.0.1:9170/attachments -H "Content-Type: application/json" --data-binary @-
+base64 pixel.png
+base64 pixel.png | jq -Rs '{file_name: "pixel.png", content_base64: .}'
+base64 pixel.png | jq -Rs '{file_name: "pixel.png", content_base64: .}' | curl -s http://127.0.0.1:9170/attachments -H "Content-Type: application/json" --data-binary @-
+openssl dgst -sha256 -binary pixel.png | base64
+echo 'reports-app:s3cret-42' | base64
+printf '%s' 'reports-app:s3cret-42' | base64
+curl -s -i http://127.0.0.1:9170/reports -H "Authorization: Basic cmVwb3J0cy1hcHA6czNjcmV0LTQyCg=="
+curl -s -i http://127.0.0.1:9170/reports -H "Authorization: Basic cmVwb3J0cy1hcHA6czNjcmV0LTQy"
+curl -s -u reports-app:s3cret-42 -v http://127.0.0.1:9170/reports 2>&1 | grep -i "^> authorization"
+echo 'cmVwb3J0cy1hcHA6czNjcmV0LTQyCg==' | base64 -d | od -c
+
+# Article code snippets run verbatim in a scratch file (Python 3.13.16, Node.js 26.10.0, OpenJDK 21.0.12)
+b'<<???>>'
+PDw/Pz8+Pg== PDw_Pz8-Pg== PDw_Pz8-Pg
+PDw/Pz8+Pg== PDw_Pz8-Pg <<???>>
+SyntaxError: Found a character that cannot be part of a valid base64 string.
+PDw_Pz8-Pg <<???>>
+InvalidCharacterError: Invalid character
+IllegalArgumentException: Illegal base64 character 5f
+PDw/Pz8+Pg== PDw_Pz8-Pg <<???>>
+
+# Revised article snippets run verbatim in scratch files (Java with try/catch, Go encode, JS try/catch)
+Illegal base64 character 5f
+PDw/Pz8+Pg== PDw_Pz8-Pg <<???>>
+PDw/Pz8+Pg== PDw_Pz8-Pg <<???>> <nil>
+SyntaxError: Found a character that cannot be part of a valid base64 string.
+PDw_Pz8-Pg <<???>>
+python3 -c urlsafe_b64decode('P*Dw_Pz8-Pg==') ->
+b'<<???>>'
+openssl base64 -A -in pixel.png ->
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP438DwHwAGgAJ/EEwb4QAAAABJRU5ErkJggg==
+python3 -c b64decode('PDw*Pz8+Pg==') ->
+binascii.Error: Invalid base64-encoded string: number of data characters (9) cannot be 1 more than a multiple of 4

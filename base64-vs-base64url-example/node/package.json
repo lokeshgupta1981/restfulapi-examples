@@ -1,0 +1,8 @@
+{
+  "name": "base64-vs-base64url-node",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node demo.mjs" }
+}
