@@ -1,0 +1,703 @@
+[
+  {
+    "name": "list_tickets",
+    "title": "List Tickets",
+    "description": "Returns one page of tickets, newest first. Use next_cursor to get the next page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "pending",
+            "closed"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ]
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Agent id, for example A-1."
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque cursor from the previous page."
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 50.0,
+          "minimum": 1.0,
+          "default": 10
+        }
+      },
+      "required": []
+    },
+    "outputSchema": {
+      "properties": {
+        "items": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "pending",
+                  "closed"
+                ]
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "normal",
+                  "high",
+                  "urgent"
+                ]
+              },
+              "assignee": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "customer_id": {
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "type": "object",
+            "required": [
+              "id",
+              "subject",
+              "status",
+              "priority",
+              "customer_id",
+              "created_at"
+            ]
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "x-fastmcp-top-level-schema": "TicketPage"
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "tickets"
+        ]
+      }
+    }
+  },
+  {
+    "name": "createTicket",
+    "title": "Createticket",
+    "description": "Create a ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string"
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ]
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "subject",
+        "customer_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "pending",
+            "closed"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "subject",
+        "status",
+        "priority",
+        "customer_id",
+        "created_at"
+      ],
+      "x-fastmcp-top-level-schema": "Ticket"
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "tickets"
+        ]
+      }
+    }
+  },
+  {
+    "name": "get_ticket",
+    "title": "Get Ticket",
+    "description": "Get a ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticket_id": {
+          "type": "string",
+          "description": "Ticket id, for example T-1004."
+        }
+      },
+      "required": [
+        "ticket_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "pending",
+            "closed"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "subject",
+        "status",
+        "priority",
+        "customer_id",
+        "created_at"
+      ],
+      "x-fastmcp-top-level-schema": "Ticket"
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "tickets"
+        ]
+      }
+    }
+  },
+  {
+    "name": "updateTicket",
+    "title": "Updateticket",
+    "description": "Changes status, priority or assignee. Fields that are left out stay unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticket_id": {
+          "type": "string",
+          "description": "Ticket id, for example T-1004."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "pending",
+            "closed"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ticket_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "pending",
+            "closed"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "urgent"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "subject",
+        "status",
+        "priority",
+        "customer_id",
+        "created_at"
+      ],
+      "x-fastmcp-top-level-schema": "Ticket"
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "tickets"
+        ]
+      }
+    }
+  },
+  {
+    "name": "listComments",
+    "title": "Listcomments",
+    "description": "List comments on a ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticket_id": {
+          "type": "string",
+          "description": "Ticket id, for example T-1004."
+        }
+      },
+      "required": [
+        "ticket_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ticket_id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "public_reply",
+                  "internal_note",
+                  "customer_message"
+                ]
+              },
+              "body": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "type": "object",
+            "required": [
+              "id",
+              "ticket_id",
+              "kind",
+              "body",
+              "author",
+              "created_at"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "x-fastmcp-wrap-result": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "comments"
+        ]
+      }
+    }
+  },
+  {
+    "name": "addComment",
+    "title": "Addcomment",
+    "description": "Adds either a public reply (emailed to the customer) or an internal note (visible to agents only).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticket_id": {
+          "type": "string",
+          "description": "Ticket id, for example T-1004."
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "public_reply"
+            },
+            {
+              "type": "string",
+              "const": "internal_note"
+            }
+          ],
+          "description": "Selects the variant. Accepted values: 'public_reply', 'internal_note'. 'public_reply' uses kind, body, notify_customer; 'internal_note' uses kind, body, mention. Send only the fields belonging to the selected variant."
+        },
+        "body": {
+          "type": "string"
+        },
+        "notify_customer": {
+          "type": "boolean",
+          "default": true
+        },
+        "mention": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Agent ids to notify."
+        }
+      },
+      "required": [
+        "ticket_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ticket_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "public_reply",
+            "internal_note",
+            "customer_message"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "ticket_id",
+        "kind",
+        "body",
+        "author",
+        "created_at"
+      ],
+      "x-fastmcp-top-level-schema": "Comment"
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "comments"
+        ]
+      }
+    }
+  },
+  {
+    "name": "getCustomer",
+    "title": "Getcustomer",
+    "description": "Get a customer",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "plan": {
+          "type": "string",
+          "enum": [
+            "free",
+            "pro",
+            "enterprise"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "email",
+        "plan"
+      ],
+      "x-fastmcp-top-level-schema": "Customer"
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "customers"
+        ]
+      }
+    }
+  },
+  {
+    "name": "listAgents",
+    "title": "Listagents",
+    "description": "List support agents",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "team": {
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "team"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "x-fastmcp-wrap-result": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "tickets"
+        ]
+      }
+    }
+  }
+]

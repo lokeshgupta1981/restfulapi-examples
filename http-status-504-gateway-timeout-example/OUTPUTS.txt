@@ -1,0 +1,177 @@
+
+===== Case 0: the report takes 1 s, proxy_read_timeout is 3 s
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:05 GMT
+Content-Type: application/json
+Content-Length: 28
+Connection: keep-alive
+
+{"report":"sales","rows":42}
+[curl time_total: 1.004671 s]
+
+===== Case 1: the report takes 5 s, proxy_read_timeout is 3 s
+HTTP/1.1 504 Gateway Time-out
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:08 GMT
+Content-Type: application/problem+json
+Content-Length: 258
+Connection: keep-alive
+X-Request-Id: 65c524a410c6c4d7b73e8675e1706e3e
+
+{"type":"https://example.com/problems/upstream-timeout","title":"Gateway Timeout","status":504,"detail":"The orders service did not answer within the gateway time limit.","instance":"/reports/sales?seconds=5","request_id":"65c524a410c6c4d7b73e8675e1706e3e"}
+
+[curl time_total: 3.005237 s]
+--- new lines in logs/error.log:
+2026/10/04 19:03:08 [error] 14081#14081: *3 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 127.0.0.1, server: , request: "GET /reports/sales?seconds=5 HTTP/1.1", upstream: "http://127.0.0.1:9504/reports/sales?seconds=5", host: "127.0.0.1:8504"
+--- app log (the app kept working after nginx gave up):
+INFO:     Started server process [14077]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:9504 (Press CTRL+C to quit)
+19:03:05 app sales report finished after 1.0 s
+INFO:     127.0.0.1:54936 - "GET /reports/sales?seconds=1 HTTP/1.1" 200 OK
+19:03:10 app sales report finished after 5.0 s
+
+===== Case 2: POST /orders takes 5 s, the client gets HTTP 504, but the order exists
+HTTP/1.1 504 Gateway Time-out
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:14 GMT
+Content-Type: application/problem+json
+Content-Length: 251
+Connection: keep-alive
+X-Request-Id: eb49ba90f569c4352604b727635ea063
+
+{"type":"https://example.com/problems/upstream-timeout","title":"Gateway Timeout","status":504,"detail":"The orders service did not answer within the gateway time limit.","instance":"/orders?seconds=5","request_id":"eb49ba90f569c4352604b727635ea063"}
+
+[curl time_total: 3.003941 s]
+--- new lines in logs/error.log:
+2026/10/04 19:03:14 [error] 14081#14081: *5 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 127.0.0.1, server: , request: "POST /orders?seconds=5 HTTP/1.1", upstream: "http://127.0.0.1:9504/orders?seconds=5", host: "127.0.0.1:8504"
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:17 GMT
+Content-Type: application/json
+Content-Length: 59
+Connection: keep-alive
+
+{"count":1,"orders":[{"id":"8dcc77d1","status":"CREATED"}]}
+[curl time_total: 0.002747 s]
+
+===== Case 3: the upstream never accepts the TCP connection (proxy_connect_timeout 2 s)
+HTTP/1.1 504 Gateway Time-out
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:19 GMT
+Content-Type: application/problem+json
+Content-Length: 248
+Connection: keep-alive
+X-Request-Id: f23861ff79cf30fc9b3f96c432d02426
+
+{"type":"https://example.com/problems/upstream-timeout","title":"Gateway Timeout","status":504,"detail":"The orders service did not answer within the gateway time limit.","instance":"/legacy/status","request_id":"f23861ff79cf30fc9b3f96c432d02426"}
+
+[curl time_total: 2.002851 s]
+--- new lines in logs/error.log:
+2026/10/04 19:03:19 [error] 14081#14081: *9 upstream timed out (110: Connection timed out) while connecting to upstream, client: 127.0.0.1, server: , request: "GET /legacy/status HTTP/1.1", upstream: "http://127.0.0.1:9505/legacy/status", host: "127.0.0.1:8504"
+
+===== Case 4: a streaming export sends a line every 2 s for 8 s, no HTTP 504
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:19 GMT
+Content-Type: application/x-ndjson
+Transfer-Encoding: chunked
+Connection: keep-alive
+
+{"row": 0}
+{"row": 1}
+{"row": 2}
+{"row": 3}
+
+[curl time_total: 8.019704 s]
+--- new lines in logs/error.log:
+
+===== Case 5: the app enforces its own 2 s budget and returns HTTP 503
+HTTP/1.1 503 Service Unavailable
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:29 GMT
+Content-Type: application/problem+json
+Content-Length: 164
+Connection: keep-alive
+retry-after: 10
+
+{"type":"https://example.com/problems/inventory-slow","title":"Service Unavailable","status":503,"detail":"The inventory database did not answer within 2 seconds."}
+[curl time_total: 2.002796 s]
+--- new lines in logs/error.log:
+
+===== Case 6: /reports/yearly takes 5 s, its location sets proxy_read_timeout 10s
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:34 GMT
+Content-Type: application/json
+Content-Length: 30
+Connection: keep-alive
+
+{"report":"yearly","rows":365}
+[curl time_total: 5.003951 s]
+--- new lines in logs/error.log:
+
+===== Case 7: slow work as a background job: HTTP 202 plus a status URL
+HTTP/1.1 202 Accepted
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:34 GMT
+Content-Type: application/json
+Content-Length: 36
+Connection: keep-alive
+location: /exports/0d83f2cf
+
+{"id":"0d83f2cf","status":"RUNNING"}
+[curl time_total: 0.001818 s]
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:34 GMT
+Content-Type: application/json
+Content-Length: 36
+Connection: keep-alive
+
+{"id":"0d83f2cf","status":"RUNNING"}
+[curl time_total: 0.001778 s]
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Sun, 04 Oct 2026 19:03:41 GMT
+Content-Type: application/json
+Content-Length: 33
+Connection: keep-alive
+
+{"id":"0d83f2cf","status":"DONE"}
+[curl time_total: 0.002161 s]
+
+===== Access log with timing variables
+"GET /reports/sales?seconds=1 HTTP/1.1" status=200 upstream_status=200 upstream_connect_time=0.001 upstream_header_time=1.005 request_time=1.004
+"GET /reports/sales?seconds=5 HTTP/1.1" status=504 upstream_status=504 upstream_connect_time=0.000 upstream_header_time=- request_time=3.003
+"POST /orders?seconds=5 HTTP/1.1" status=504 upstream_status=504 upstream_connect_time=0.001 upstream_header_time=- request_time=3.003
+"GET /orders HTTP/1.1" status=200 upstream_status=200 upstream_connect_time=0.000 upstream_header_time=0.002 request_time=0.002
+"GET /legacy/status HTTP/1.1" status=504 upstream_status=504 upstream_connect_time=- upstream_header_time=- request_time=2.002
+"GET /reports/export HTTP/1.1" status=200 upstream_status=200 upstream_connect_time=0.000 upstream_header_time=0.014 request_time=8.019
+"GET /inventory HTTP/1.1" status=503 upstream_status=503 upstream_connect_time=0.001 upstream_header_time=2.003 request_time=2.002
+"GET /reports/yearly HTTP/1.1" status=200 upstream_status=200 upstream_connect_time=0.000 upstream_header_time=5.003 request_time=5.004
+"POST /exports HTTP/1.1" status=202 upstream_status=202 upstream_connect_time=0.000 upstream_header_time=0.002 request_time=0.002
+"GET /exports/0d83f2cf HTTP/1.1" status=200 upstream_status=200 upstream_connect_time=0.001 upstream_header_time=0.002 request_time=0.001
+"GET /exports/0d83f2cf HTTP/1.1" status=200 upstream_status=200 upstream_connect_time=0.000 upstream_header_time=0.002 request_time=0.002
+
+===== Full app log
+INFO:     Started server process [14077]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:9504 (Press CTRL+C to quit)
+19:03:05 app sales report finished after 1.0 s
+INFO:     127.0.0.1:54936 - "GET /reports/sales?seconds=1 HTTP/1.1" 200 OK
+19:03:10 app sales report finished after 5.0 s
+19:03:11 app order 8dcc77d1 saved
+19:03:16 app order 8dcc77d1 response ready
+INFO:     127.0.0.1:57050 - "GET /orders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57062 - "GET /reports/export HTTP/1.1" 200 OK
+19:03:29 app inventory query cancelled after 2.0 s
+INFO:     127.0.0.1:40264 - "GET /inventory HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:40270 - "GET /reports/yearly HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41230 - "POST /exports HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:41246 - "GET /exports/0d83f2cf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41260 - "GET /exports/0d83f2cf HTTP/1.1" 200 OK
+2026/10/04 19:03:41 [notice] 14123#14123: signal process started

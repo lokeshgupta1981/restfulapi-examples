@@ -1,0 +1,163 @@
+# Captured 2026-10-04T19:24Z on Python 3.13.16, mcp 2.3.0, clean venv from requirements.txt
+
+################ RUN 1: ./curl_demo.sh
+== 1. Call a tool without a token
+HTTP/1.1 401 Unauthorized
+date: Sun, 04 Oct 2026 19:24:26 GMT
+server: uvicorn
+content-type: application/json
+content-length: 74
+www-authenticate: Bearer error="invalid_token", error_description="Authentication required", resource_metadata="http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp"
+
+{"error": "invalid_token", "error_description": "Authentication required"}
+
+== 2. Protected resource metadata (RFC 9728)
+{
+    "resource": "http://127.0.0.1:9410/mcp",
+    "authorization_servers": [
+        "http://127.0.0.1:9420"
+    ],
+    "scopes_supported": [
+        "orders:read"
+    ],
+    "bearer_methods_supported": [
+        "header"
+    ]
+}
+
+== 3. Authorization server metadata (RFC 8414)
+{
+    "issuer": "http://127.0.0.1:9420",
+    "authorization_endpoint": "http://127.0.0.1:9420/authorize",
+    "token_endpoint": "http://127.0.0.1:9420/token",
+    "jwks_uri": "http://127.0.0.1:9420/jwks.json",
+    "response_types_supported": [
+        "code"
+    ],
+    "grant_types_supported": [
+        "authorization_code"
+    ],
+    "token_endpoint_auth_methods_supported": [
+        "none"
+    ],
+    "code_challenge_methods_supported": [
+        "S256"
+    ],
+    "scopes_supported": [
+        "orders:read",
+        "orders:write",
+        "reports:read"
+    ],
+    "authorization_response_iss_parameter_supported": true
+}
+
+== 4. Get a token for this MCP server with scope orders:read
+{
+  "iss": "http://127.0.0.1:9420",
+  "sub": "asha",
+  "aud": "http://127.0.0.1:9410/mcp",
+  "client_id": "orders-desktop",
+  "scope": "orders:read",
+  "iat": 1791141866,
+  "exp": 1791142166,
+  "jti": "a04a4694-88d0-4017-bc92-69ed323d2949"
+}
+
+== 5. Call list_orders with the token
+HTTP/1.1 200 OK
+date: Sun, 04 Oct 2026 19:24:26 GMT
+server: uvicorn
+content-length: 608
+content-type: application/json
+
+{"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"{\n  \"id\": \"ord_1001\",\n  \"customer\": \"asha\",\n  \"total\": \"49.90\",\n  \"status\": \"shipped\"\n}","type":"text"},{"text":"{\n  \"id\": \"ord_1002\",\n  \"customer\": \"asha\",\n  \"total\": \"15.00\",\n  \"status\": \"pending\"\n}","type":"text"}],"isError":false,"resultType":"complete","structuredContent":{"result":[{"id":"ord_1001","customer":"asha","total":"49.90","status":"shipped"},{"id":"ord_1002","customer":"asha","total":"15.00","status":"pending"}]},"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"Orders","version":""}}}}
+
+== 6. Call cancel_order with the same token
+HTTP/1.1 403 Forbidden
+date: Sun, 04 Oct 2026 19:24:26 GMT
+server: uvicorn
+content-type: application/json
+www-authenticate: Bearer error="insufficient_scope", scope="orders:write", resource_metadata="http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp", error_description="This tool needs the orders:write scope"
+Transfer-Encoding: chunked
+
+{"error": "insufficient_scope", "scope": "orders:write"}
+
+== 7. Send a token issued for another API (the reports API)
+HTTP/1.1 401 Unauthorized
+date: Sun, 04 Oct 2026 19:24:27 GMT
+server: uvicorn
+content-type: application/json
+content-length: 74
+www-authenticate: Bearer error="invalid_token", error_description="Authentication required", resource_metadata="http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp"
+
+{"error": "invalid_token", "error_description": "Authentication required"}
+
+################ mcp_server.py log after RUN 1 (one line each for steps 5, 6 and 7)
+StreamableHTTP session manager started
+tool=list_orders sub=asha client_id=orders-desktop
+denied sub=asha missing scope=orders:write
+token rejected: InvalidAudienceError: Audience doesn't match
+
+################ RUN 2: python client.py (servers restarted)
+--> POST http://127.0.0.1:9410/mcp  server/discover
+<-- HTTP 401
+    WWW-Authenticate: Bearer error="invalid_token", error_description="Authentication required", resource_metadata="http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp"
+--> GET http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp
+<-- HTTP 200
+--> GET http://127.0.0.1:9420/.well-known/oauth-authorization-server
+<-- HTTP 200
+    browser opens /authorize with {"client_id": "orders-desktop", "scope": "orders:read", "resource": "http://127.0.0.1:9410/mcp", "code_challenge_method": "S256"}
+    redirect back to http://127.0.0.1:9499/callback with code, state and iss=http://127.0.0.1:9420
+--> POST http://127.0.0.1:9420/token
+<-- HTTP 200
+    token received: scope='orders:read' expires_in=300
+--> POST http://127.0.0.1:9410/mcp  server/discover  (Bearer token)
+<-- HTTP 200
+
+== call list_orders
+--> POST http://127.0.0.1:9410/mcp  tools/call list_orders  (Bearer token)
+<-- HTTP 200
+--> POST http://127.0.0.1:9410/mcp  tools/list  (Bearer token)
+<-- HTTP 200
+    result: {"result": [{"id": "ord_1001", "customer": "asha", "total": "49.90", "status": "shipped"}, {"id": "ord_1002", "customer": "asha", "total": "15.00", "status": "pending"}]}
+
+== call cancel_order
+--> POST http://127.0.0.1:9410/mcp  tools/call cancel_order  (Bearer token)
+<-- HTTP 403
+    WWW-Authenticate: Bearer error="insufficient_scope", scope="orders:write", resource_metadata="http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp", error_description="This tool needs the orders:write scope"
+    browser opens /authorize with {"client_id": "orders-desktop", "scope": "orders:read orders:write", "resource": "http://127.0.0.1:9410/mcp", "code_challenge_method": "S256"}
+    redirect back to http://127.0.0.1:9499/callback with code, state and iss=http://127.0.0.1:9420
+--> POST http://127.0.0.1:9420/token
+<-- HTTP 200
+    token received: scope='orders:read orders:write' expires_in=300
+--> POST http://127.0.0.1:9410/mcp  tools/call cancel_order  (Bearer token)
+<-- HTTP 200
+    result: {"id": "ord_1002", "customer": "asha", "total": "15.00", "status": "cancelled"}
+
+################ mcp_server.py log after RUN 2
+StreamableHTTP session manager started
+tool=list_orders sub=asha client_id=orders-desktop
+denied sub=asha missing scope=orders:write
+tool=cancel_order sub=asha client_id=orders-desktop order=ord_1002
+
+################ EXTRA CHECKS (servers restarted, 2026-10-04T18:44Z)
+# a) cancel_order on ord_1001 (status shipped) with an "orders:read orders:write" token: tool error comes back as HTTP 200, isError true
+HTTP/1.1 200 OK
+date: Sun, 04 Oct 2026 18:44:59 GMT
+server: uvicorn
+content-length: 223
+content-type: application/json
+
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"text":"Error executing tool cancel_order","type":"text"}],"isError":true,"resultType":"complete","_meta":{"io.modelcontextprotocol/serverInfo":{"name":"Orders","version":""}}}}
+
+# b) token with only "orders:write" (missing the server-wide required scope orders:read): the SDK's own 403
+HTTP/1.1 403 Forbidden
+date: Sun, 04 Oct 2026 18:44:59 GMT
+server: uvicorn
+content-type: application/json
+content-length: 83
+www-authenticate: Bearer error="insufficient_scope", error_description="Required scope: orders:read", resource_metadata="http://127.0.0.1:9410/.well-known/oauth-protected-resource/mcp"
+
+{"error": "insufficient_scope", "error_description": "Required scope: orders:read"}
+
+# c) pydantic: str(AnyHttpUrl('http://127.0.0.1:9420')) -> http://127.0.0.1:9420/

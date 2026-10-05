@@ -1,0 +1,6 @@
+node_modules/
+client/
+docs/
+prism.log
+code-first/.venv/
+code-first/generated-openapi.json

@@ -1,0 +1,350 @@
+openapi: 3.2.0
+info:
+  title: Orders API
+  version: 1.0.0
+  summary: Create, list and read customer orders.
+  description: |
+    A small Orders API used to teach the OpenAPI Specification.
+    All errors use Problem Details (RFC 9457).
+  contact:
+    name: API Support
+    url: https://example.com/support
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: http://localhost:4010
+    description: Local mock server (Prism)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: orders
+    summary: Orders
+    description: Create, list and read orders.
+    kind: nav
+
+paths:
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List orders
+      description: Returns orders, newest first. Filter by status with the status query parameter.
+      tags: [orders]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Return only orders with this status.
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of orders.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+              examples:
+                twoOrders:
+                  summary: Two orders
+                  value:
+                    items:
+                      - id: ord_1001
+                        status: pending
+                        currency: USD
+                        total: '59.90'
+                        items:
+                          - sku: BOOK-REST-101
+                            quantity: 2
+                        createdAt: '2026-10-05T09:30:00Z'
+                      - id: ord_1000
+                        status: shipped
+                        currency: USD
+                        total: '24.50'
+                        items:
+                          - sku: MUG-API-01
+                            quantity: 1
+                        createdAt: '2026-10-04T16:12:00Z'
+                    nextCursor: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createOrder
+      summary: Create an order
+      tags: [orders]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: A unique value per order attempt, so a retried POST does not create a second order.
+          schema:
+            type: string
+            maxLength: 64
+          example: 5f2b7c1e-9a4d-4c55-8f0e-2d6b1a7e3c90
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOrder'
+            examples:
+              twoBooks:
+                summary: Two copies of one book
+                value:
+                  currency: USD
+                  items:
+                    - sku: BOOK-REST-101
+                      quantity: 2
+      responses:
+        '201':
+          description: The order was created.
+          headers:
+            Location:
+              description: URL of the new order.
+              schema:
+                type: string
+                format: uri-reference
+              example: /orders/ord_1002
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              examples:
+                created:
+                  value:
+                    id: ord_1002
+                    status: pending
+                    currency: USD
+                    total: '59.90'
+                    items:
+                      - sku: BOOK-REST-101
+                        quantity: 2
+                    createdAt: '2026-10-05T10:02:11Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        description: The order ID, for example ord_1001.
+        schema:
+          type: string
+          pattern: '^ord_[0-9]+$'
+    get:
+      operationId: getOrder
+      summary: Get one order
+      tags: [orders]
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Send an access token in the Authorization header as "Bearer <token>".
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of orders to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [pending, paid, shipped, cancelled]
+
+    OrderItem:
+      type: object
+      required: [sku, quantity]
+      properties:
+        sku:
+          type: string
+          examples: [BOOK-REST-101]
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+
+    NewOrder:
+      type: object
+      required: [currency, items]
+      properties:
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 currency code.
+          examples: [USD]
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    Order:
+      type: object
+      required: [id, status, currency, total, items, createdAt]
+      properties:
+        id:
+          type: string
+          readOnly: true
+          examples: [ord_1001]
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        currency:
+          type: string
+          examples: [USD]
+        total:
+          type: string
+          description: Decimal amount as a string, so no precision is lost.
+          examples: ['59.90']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          examples: ['2026-10-05T09:30:00Z']
+
+    OrderList:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        nextCursor:
+          type: [string, 'null']
+          description: Cursor for the next page, or null on the last page.
+
+    Problem:
+      type: object
+      description: Problem Details object (RFC 9457).
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        errors:
+          type: array
+          description: Extension member with one entry per invalid field.
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      required: [pointer, message]
+      properties:
+        pointer:
+          type: string
+          description: JSON Pointer to the invalid field.
+        message:
+          type: string
+
+  responses:
+    BadRequest:
+      description: The request is malformed, for example an unknown query value.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            badQuery:
+              value:
+                type: https://api.example.com/problems/bad-request
+                title: Bad request
+                status: 400
+                detail: Query parameter limit must be between 1 and 100.
+    Unauthorized:
+      description: The access token is missing, expired or invalid.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer realm="orders"
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            missingToken:
+              value:
+                type: https://api.example.com/problems/unauthorized
+                title: Unauthorized
+                status: 401
+                detail: Send a valid access token in the Authorization header.
+    NotFound:
+      description: No order exists with this ID.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            missingOrder:
+              value:
+                type: https://api.example.com/problems/order-not-found
+                title: Order not found
+                status: 404
+                detail: No order exists with ID ord_9999.
+                instance: /orders/ord_9999
+    ValidationFailed:
+      description: The body is valid JSON but breaks a business or schema rule.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            badQuantity:
+              value:
+                type: https://api.example.com/problems/validation-failed
+                title: Validation failed
+                status: 422
+                detail: One or more fields are invalid.
+                errors:
+                  - pointer: /items/0/quantity
+                    message: must be between 1 and 99

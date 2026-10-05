@@ -1,0 +1,4 @@
+{"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+ "params": {"name": "cancel_order", "arguments": {"order_id": "ord_1002"},
+  "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {}}}}

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "task-tracker": {
+      "command": "/path/to/how-to-build-an-mcp-server-example/.venv/bin/python",
+      "args": ["/path/to/how-to-build-an-mcp-server-example/server.py"]
+    },
+    "task-tracker-http": {
+      "type": "http",
+      "url": "http://127.0.0.1:8040/mcp"
+    }
+  }
+}

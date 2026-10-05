@@ -1,0 +1,253 @@
+
+========== versions ==========
+v22.22.0
+2.57.0
+5.16.0
+7.25.0
+
+========== redocly lint openapi.yaml ==========
+validating openapi.yaml...
+openapi.yaml: validated in 146ms
+
+Woohoo! Your API description is valid. 🎉
+
+
+========== redocly lint openapi-broken.yaml --format=stylish ==========
+validating openapi-broken.yaml...
+openapi-broken.yaml:
+  16:5    error    operation-operationId                  Operation object should contain `operationId` field.
+  19:7    error    operation-4xx-response                 Operation must have at least one `4XX` response.
+  103:11  error    struct                                 Property `nullable` is not expected here.
+  49:17   error    no-unresolved-refs                     Can't resolve $ref
+  50:9    error    operation-4xx-problem-details-rfc7807  Response `4xx` must have content-type `application/problem+json`.
+  58:7    error    operation-operationId-unique           Every operation must have a unique `operationId`.
+  68:9    error    operation-4xx-problem-details-rfc7807  Response `4xx` must have content-type `application/problem+json`.
+  57:5    error    path-parameters-defined                The operation does not define the path parameter `{orderId}` expected by path `/orders/{orderId}`.
+  13:5    warning  tag-description                        Tag object should contain `description` field.
+  42:33   warning  no-invalid-media-type-examples         Example value must conform to the schema: `quantity` property type must be integer.
+  111:5   warning  no-unused-components                   Component: "Customer" is never used.
+
+openapi-broken.yaml: validated in 69ms
+
+❌ Validation failed with 8 errors and 3 warnings.
+run `redocly lint --generate-ignore-file` to add all problems to the ignore file.
+
+
+========== redocly build-docs ==========
+
+🎉 bundled successfully in: docs/index.html (84 KiB) [⏱ 5ms].
+
+========== prism mock ==========
+[12:06:13 AM] › [CLI] …  awaiting  Starting Prism…
+[12:06:13 AM] › [CLI] ℹ  info      GET        http://127.0.0.1:4010/orders
+[12:06:13 AM] › [CLI] ℹ  info      POST       http://127.0.0.1:4010/orders
+[12:06:13 AM] › [CLI] ℹ  info      GET        http://127.0.0.1:4010/orders/ord_9886597957
+[12:06:13 AM] › [CLI] ▶  start     Prism is listening on http://127.0.0.1:4010
+
+========== GET /orders?status=pending ==========
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+Content-type: application/json
+Content-Length: 330
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"items":[{"id":"ord_1001","status":"pending","currency":"USD","total":"59.90","items":[{"sku":"BOOK-REST-101","quantity":2}],"createdAt":"2026-10-05T09:30:00Z"},{"id":"ord_1000","status":"shipped","currency":"USD","total":"24.50","items":[{"sku":"MUG-API-01","quantity":1}],"createdAt":"2026-10-04T16:12:00Z"}],"nextCursor":null}
+
+========== GET /orders without a token ==========
+HTTP/1.1 401 Unauthorized
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["request"],"severity":"Error","code":401,"message":"Invalid security scheme used"}]
+WWW-Authenticate: Bearer realm="orders"
+Content-type: application/problem+json
+Content-Length: 158
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/unauthorized","title":"Unauthorized","status":401,"detail":"Send a valid access token in the Authorization header."}
+
+========== GET /orders?limit=500 ==========
+HTTP/1.1 400 Bad Request
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["request","query","limit"],"severity":"Error","code":"maximum","message":"Request query parameter limit must be <= 100"}]
+Content-type: application/problem+json
+Content-Length: 150
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/bad-request","title":"Bad request","status":400,"detail":"Query parameter limit must be between 1 and 100."}
+
+========== POST /orders valid ==========
+HTTP/1.1 201 Created
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+Location: /orders/ord_1002
+Content-type: application/json
+Content-Length: 151
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"id":"ord_1002","status":"pending","currency":"USD","total":"59.90","items":[{"sku":"BOOK-REST-101","quantity":2}],"createdAt":"2026-10-05T10:02:11Z"}
+
+========== POST /orders quantity 0 ==========
+HTTP/1.1 422 Unprocessable Entity
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["request","body","items","0","quantity"],"severity":"Error","code":"minimum","message":"Request body property items.0.quantity must be >= 1"}]
+Content-type: application/problem+json
+Content-Length: 225
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/validation-failed","title":"Validation failed","status":422,"detail":"One or more fields are invalid.","errors":[{"pointer":"/items/0/quantity","message":"must be between 1 and 99"}]}
+
+========== POST /orders without Idempotency-Key ==========
+HTTP/1.1 422 Unprocessable Entity
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["request","header"],"severity":"Error","code":"required","message":"Request header must have required property 'idempotency-key'"}]
+Content-type: application/problem+json
+Content-Length: 225
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/validation-failed","title":"Validation failed","status":422,"detail":"One or more fields are invalid.","errors":[{"pointer":"/items/0/quantity","message":"must be between 1 and 99"}]}
+
+========== GET /orders/ord_9999 with Prefer: code=404 ==========
+HTTP/1.1 404 Not Found
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+Content-type: application/problem+json
+Content-Length: 173
+Date: Sun, 04 Oct 2026 18:36:20 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"https://api.example.com/problems/order-not-found","title":"Order not found","status":404,"detail":"No order exists with ID ord_9999.","instance":"/orders/ord_9999"}
+
+========== generate typescript-fetch client ==========
+[main] WARN  o.o.codegen.DefaultCodegen - OpenAPI 3.1 support is still in beta. To report an issue related to 3.1 spec, please kindly open an issue in the Github repo: https://github.com/openAPITools/openapi-generator.
+[main] WARN  o.o.codegen.utils.ModelUtils - Failed to get the schema name: null
+client/apis/OrdersApi.ts
+client/apis/index.ts
+client/index.ts
+client/models/FieldError.ts
+client/models/NewOrder.ts
+client/models/Order.ts
+client/models/OrderItem.ts
+client/models/OrderList.ts
+client/models/OrderStatus.ts
+client/models/Problem.ts
+client/models/index.ts
+client/runtime.ts
+
+========== run generated client against the mock ==========
+listOrders -> 2 order(s), first id: ord_1001
+createOrder -> ord_1002 pending 2026-10-05T10:02:11.000Z
+
+========== OpenAPI 3.2 copy: redocly lint ==========
+
+Woohoo! Your API description is valid. 🎉
+
+
+========== OpenAPI 3.2 copy: openapi-generator ==========
+[main] ERROR i.s.parser.SwaggerCompatConverter - failed to read resource listing
+[main] ERROR i.s.parser.SwaggerCompatConverter - failed to read resource listing
+Exception in thread "main" org.openapitools.codegen.SpecValidationException: There were issues with the specification. The option can be disabled via validateSpec (Maven/Gradle) or --skip-validate-spec (CLI).
+ | Error count: 19, Warning count: 0
+Errors: 
+	-attribute swagger is missing
+	-attribute paths.'/orders'(get).responses.200.content is unexpected
+	-attribute tags.tags.externalDocs.summary is unexpected
+	-attribute components is unexpected
+	-attribute paths.'/orders'(post).[Idempotency-Key].type is missing
+	-attribute paths.'/orders/{orderId}'(get).responses.200.content is unexpected
+	-attribute paths.'/orders/{orderId}'.[orderId].schema is unexpected
+
+========== code-first: FastAPI ==========
+openapi: 3.1.0
+POST /orders operationId: create_order_orders_post responses: 201, 422
+GET /orders/{order_id} operationId: get_order_orders__order_id__get responses: 200, 422
+fastapi==0.142.2
+pydantic==2.13.5
+starlette==1.7.0
+validating code-first/generated-openapi.json...
+code-first/generated-openapi.json:
+  2:3    error    no-empty-servers                       Servers must be present.
+  47:11  error    operation-4xx-problem-details-rfc7807  Response `4xx` must have content-type `application/problem+json`.
+  89:11  error    operation-4xx-problem-details-rfc7807  Response `4xx` must have content-type `application/problem+json`.
+  9:7    error    security-defined                       Every operation should have security defined on it or on the root level.
+  61:7   error    security-defined                       Every operation should have security defined on it or on the root level.
+  3:3    warning  info-license                           Info object should contain `license` field.
+
+code-first/generated-openapi.json: validated in 47ms
+
+❌ Validation failed with 5 errors and 1 warning.
+run `redocly lint --generate-ignore-file` to add all problems to the ignore file.
+
+
+========== APPENDIX: earlier run, BEFORE examples were added to the 401 and 201 responses (same Prism 5.16.0) ==========
+$ curl -s -i http://127.0.0.1:4010/orders
+HTTP/1.1 401 Unauthorized
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+sl-violations: [{"location":["request"],"severity":"Error","code":401,"message":"Invalid security scheme used"}]
+WWW-Authenticate: string
+Content-type: application/problem+json
+Content-Length: 148
+Date: Sun, 04 Oct 2026 18:34:32 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"string","status":100,"detail":"string","instance":"../dictionary","errors":[{"pointer":"string","message":"string"}]}
+
+$ curl -s -i -X POST ... (valid body, 201 without example)
+HTTP/1.1 201 Created
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: *
+Location: ../dictionary
+Content-type: application/json
+Content-Length: 151
+Date: Sun, 04 Oct 2026 18:34:32 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"id":"ord_1001","status":"pending","currency":"USD","total":"59.90","items":[{"sku":"BOOK-REST-101","quantity":1}],"createdAt":"2019-08-24T14:15:22Z"}
+
+
+========== APPENDIX: OpenAPI 3.2 copy with value -> dataValue (sed 's/value:/dataValue:/' openapi-3.2.yaml), Prism 5.16.0 ==========
+$ npx redocly lint openapi-3.2-datavalue.yaml
+
+Woohoo! Your API description is valid. 🎉
+
+$ curl -s "http://127.0.0.1:4010/orders?status=pending" -H "Authorization: Bearer demo-token"
+{"items":[{"id":"ord_1001","status":"pending","currency":"USD","total":"59.90","items":[{"sku":"BOOK-REST-101","quantity":1}],"createdAt":"2026-10-05T09:30:00Z"}],"nextCursor":"string"}
+$ curl -s http://127.0.0.1:4010/orders/ord_9999 -H "Authorization: Bearer demo-token" -H "Prefer: code=404"
+{"type":"about:blank","title":"string","status":100,"detail":"string","instance":"../dictionary","errors":[{"pointer":"string","message":"string"}]}

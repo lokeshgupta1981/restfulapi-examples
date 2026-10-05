@@ -1,0 +1,491 @@
+[
+  {
+    "name": "find_tickets",
+    "title": "Find Tickets",
+    "description": "Find tickets, newest first. All filters are optional.\nReturns short rows; call get_ticket_overview for the full ticket and its comments.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "open",
+                "pending",
+                "closed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "normal",
+                "high",
+                "urgent"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Agent id from list_agents, for example A-2"
+        },
+        "customer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Customer id, for example C-201"
+        },
+        "max_results": {
+          "default": 20,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "outputSchema": {
+      "properties": {
+        "tickets": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string"
+              },
+              "assignee": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "customer_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "subject",
+              "status",
+              "priority",
+              "assignee",
+              "customer_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "more_available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tickets",
+        "more_available"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "get_ticket_overview",
+    "title": "Get Ticket Overview",
+    "description": "Get one ticket with its customer and all comments, oldest comment first.\nTicket ids look like T-1004.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ticket_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticket_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "ticket": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "string"
+            },
+            "assignee": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "customer_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "subject",
+            "status",
+            "priority",
+            "assignee",
+            "customer_id"
+          ],
+          "type": "object"
+        },
+        "customer_name": {
+          "type": "string"
+        },
+        "customer_plan": {
+          "type": "string"
+        },
+        "comments": {
+          "items": {
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "author",
+              "created_at",
+              "body"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ticket",
+        "customer_name",
+        "customer_plan",
+        "comments"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "reply_to_customer",
+    "title": "Reply To Customer",
+    "description": "Email a reply to the customer and set the ticket to pending (waiting for the customer).\nShow the user the message text before calling this tool.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ticket_id": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticket_id",
+        "message"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string"
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "customer_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "subject",
+        "status",
+        "priority",
+        "assignee",
+        "customer_id"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "close_ticket",
+    "title": "Close Ticket",
+    "description": "Close a ticket and save the resolution as an internal note.\nCall it first without confirmation and show the returned summary to the user.\nOnly after the user agrees, call it again with the confirmation code from the first result.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ticket_id": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "confirmation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "ticket_id",
+        "resolution"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "status": {
+          "enum": [
+            "needs_confirmation",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "confirmation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "status",
+        "message"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "get_customer",
+    "title": "Get Customer",
+    "description": "Get a customer's name, plan and contact email by customer id, for example C-201.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer_id"
+      ]
+    },
+    "outputSchema": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "plan": {
+          "type": "string",
+          "enum": [
+            "free",
+            "pro",
+            "enterprise"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "email",
+        "plan"
+      ],
+      "x-fastmcp-top-level-schema": "Customer"
+    },
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "customers"
+        ]
+      }
+    }
+  },
+  {
+    "name": "list_agents",
+    "title": "List Agents",
+    "description": "List the support agents with their ids (A-1, A-2, ...), names and teams. Use an agent id as the assignee filter in find_tickets.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "team": {
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "team"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "x-fastmcp-wrap-result": true
+    },
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "tickets"
+        ]
+      }
+    }
+  }
+]
