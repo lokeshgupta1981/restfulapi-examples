@@ -1,0 +1,7 @@
+{
+  "name": "tsconfig-comments-demo",
+  "private": true,
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

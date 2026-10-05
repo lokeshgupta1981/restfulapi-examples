@@ -1,0 +1,571 @@
+Captured 2026-10-05. Python 3.13, Node.js 22.22.0, OpenJDK 21.0.12, curl 8.5.0, HeadlessChrome 141 (Playwright 1.56.0).
+
+===== 1. Raw requests seen by capture/wire_server.py (port 9170)
+(clients in order: capture/curl_clients.sh, capture/fetch_clients.mjs, capture/requests_clients.py, capture/browser_forms.py; CR bytes are not printed)
+wire server on http://127.0.0.1:9170
+----- request (66 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+User-Agent: curl/8.5.0
+Accept: */*
+Content-Length: 66
+Content-Type: application/x-www-form-urlencoded
+
+subject=Login+fails+%26+shows+500&priority=high&tags=auth&tags=web
+----- end -----
+----- request (457 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+User-Agent: curl/8.5.0
+Accept: */*
+Content-Length: 457
+Content-Type: multipart/form-data; boundary=------------------------DbtAgy3atskB7op5sLBMqY
+
+--------------------------DbtAgy3atskB7op5sLBMqY
+Content-Disposition: form-data; name="subject"
+
+Login fails & shows 500
+--------------------------DbtAgy3atskB7op5sLBMqY
+Content-Disposition: form-data; name="priority"
+
+high
+--------------------------DbtAgy3atskB7op5sLBMqY
+Content-Disposition: form-data; name="attachment"; filename="error.log"
+Content-Type: text/plain
+
+ERROR 500 at /login
+
+--------------------------DbtAgy3atskB7op5sLBMqY--
+
+----- end -----
+----- request (77 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+User-Agent: curl/8.5.0
+Content-Type: application/json
+Accept: application/json
+Content-Length: 77
+
+{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"]}
+----- end -----
+----- request (66 body bytes) -----
+POST /oauth/token HTTP/1.1
+Host: 127.0.0.1:9170
+Authorization: Basic dGlja2V0LWNsaTpzM2NyZXQ=
+User-Agent: curl/8.5.0
+Accept: */*
+Content-Length: 66
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&scope=tickets%3Aread+tickets%3Awrite
+----- end -----
+----- request (66 body bytes) -----
+POST /tickets HTTP/1.1
+host: 127.0.0.1:9170
+connection: keep-alive
+content-type: application/x-www-form-urlencoded;charset=UTF-8
+accept: */*
+accept-language: *
+sec-fetch-mode: cors
+user-agent: node
+accept-encoding: gzip, deflate
+content-length: 66
+
+subject=Login+fails+%26+shows+500&priority=high&tags=auth&tags=web
+----- end -----
+----- request (401 body bytes) -----
+POST /tickets HTTP/1.1
+host: 127.0.0.1:9170
+connection: keep-alive
+content-type: multipart/form-data; boundary=----formdata-undici-025526823714
+accept: */*
+accept-language: *
+sec-fetch-mode: cors
+user-agent: node
+accept-encoding: gzip, deflate
+content-length: 401
+
+------formdata-undici-025526823714
+Content-Disposition: form-data; name="subject"
+
+Login fails & shows 500
+------formdata-undici-025526823714
+Content-Disposition: form-data; name="priority"
+
+high
+------formdata-undici-025526823714
+Content-Disposition: form-data; name="attachment"; filename="error.log"
+Content-Type: text/plain
+
+ERROR 500 at /login
+
+------formdata-undici-025526823714--
+
+----- end -----
+----- request (77 body bytes) -----
+POST /tickets HTTP/1.1
+host: 127.0.0.1:9170
+connection: keep-alive
+Content-Type: application/json
+accept: */*
+accept-language: *
+sec-fetch-mode: cors
+user-agent: node
+accept-encoding: gzip, deflate
+content-length: 77
+
+{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"]}
+----- end -----
+----- request (77 body bytes) -----
+POST /tickets HTTP/1.1
+host: 127.0.0.1:9170
+connection: keep-alive
+content-type: text/plain;charset=UTF-8
+accept: */*
+accept-language: *
+sec-fetch-mode: cors
+user-agent: node
+accept-encoding: gzip, deflate
+content-length: 77
+
+{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"]}
+----- end -----
+----- request (66 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+User-Agent: python-requests/2.34.2
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 66
+Content-Type: application/x-www-form-urlencoded
+
+subject=Login+fails+%26+shows+500&priority=high&tags=auth&tags=web
+----- end -----
+----- request (401 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+User-Agent: python-requests/2.34.2
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 401
+Content-Type: multipart/form-data; boundary=be3f76e624983e699df177a7e090e176
+
+--be3f76e624983e699df177a7e090e176
+Content-Disposition: form-data; name="subject"
+
+Login fails & shows 500
+--be3f76e624983e699df177a7e090e176
+Content-Disposition: form-data; name="priority"
+
+high
+--be3f76e624983e699df177a7e090e176
+Content-Disposition: form-data; name="attachment"; filename="error.log"
+Content-Type: text/plain
+
+ERROR 500 at /login
+
+--be3f76e624983e699df177a7e090e176--
+
+----- end -----
+----- request (83 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+User-Agent: python-requests/2.34.2
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 83
+Content-Type: application/json
+
+{"subject": "Login fails & shows 500", "priority": "high", "tags": ["auth", "web"]}
+----- end -----
+----- request (66 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+Connection: keep-alive
+Content-Length: 66
+Cache-Control: max-age=0
+sec-ch-ua: "HeadlessChrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Linux"
+Origin: http://127.0.0.1:9170
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Referer: http://127.0.0.1:9170/form
+Accept-Encoding: gzip, deflate, br, zstd
+
+subject=Login+fails+%26+shows+500&priority=high&tags=auth&tags=web
+----- end -----
+----- request (425 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+Connection: keep-alive
+Content-Length: 425
+Cache-Control: max-age=0
+sec-ch-ua: "HeadlessChrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Linux"
+Origin: http://127.0.0.1:9170
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryp9UIgG455eBMiCZL
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Referer: http://127.0.0.1:9170/form
+Accept-Encoding: gzip, deflate, br, zstd
+
+------WebKitFormBoundaryp9UIgG455eBMiCZL
+Content-Disposition: form-data; name="subject"
+
+Login fails & shows 500
+------WebKitFormBoundaryp9UIgG455eBMiCZL
+Content-Disposition: form-data; name="priority"
+
+high
+------WebKitFormBoundaryp9UIgG455eBMiCZL
+Content-Disposition: form-data; name="attachment"; filename="error.log"
+Content-Type: text/x-log
+
+ERROR 500 at /login
+
+------WebKitFormBoundaryp9UIgG455eBMiCZL--
+
+----- end -----
+----- request (48 body bytes) -----
+POST /tickets HTTP/1.1
+Host: 127.0.0.1:9170
+Connection: keep-alive
+Content-Length: 48
+Cache-Control: max-age=0
+sec-ch-ua: "HeadlessChrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Linux"
+Origin: http://127.0.0.1:9170
+Content-Type: text/plain
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
+Referer: http://127.0.0.1:9170/form
+Accept-Encoding: gzip, deflate, br, zstd
+
+subject=Login fails & shows 500
+priority=high
+
+----- end -----
+
+===== client console output
+$ curl -d (x-www-form-urlencoded)
+{"received": true}
+$ curl -F (multipart/form-data)
+{"received": true}
+$ curl --json (application/json)
+{"received": true}
+$ curl OAuth 2.0 token request (x-www-form-urlencoded)
+{"received": true}
+sent 4 requests
+sent 3 requests
+submitted 3 forms
+
+===== 2. bash curl_servers.sh (Express 9171, FastAPI 9172, Spring Boot 9173)
+########## http://127.0.0.1:9171
+$ curl -s http://127.0.0.1:9171/tickets --json {"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"],"customer":{"id":"c-1042","plan":"pro"}}
+{"contentType":"application/json","body":{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"],"customer":{"id":"c-1042","plan":"pro"}},"attachment":null}
+
+$ curl -s http://127.0.0.1:9171/tickets --data-urlencode subject=Login fails & shows 500 -d priority=high -d tags=auth -d tags=web
+{"contentType":"application/x-www-form-urlencoded","body":{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"]},"attachment":null}
+
+$ curl -s http://127.0.0.1:9171/tickets -F subject=Login fails & shows 500 -F priority=high -F attachment=@error.log;type=text/plain
+{"contentType":"multipart/form-data; boundary=------------------------94O8byL9JFVoDCApLTRjJt","body":{"subject":"Login fails & shows 500","priority":"high"},"attachment":{"filename":"error.log","contentType":"text/plain","size":20}}
+
+$ curl -s http://127.0.0.1:9171/tickets -d subject=Login -d customer[id]=c-1042 -d customer[plan]=pro
+{"contentType":"application/x-www-form-urlencoded","body":{"subject":"Login","customer":{"id":"c-1042","plan":"pro"}},"attachment":null}
+
+# mistakes
+$ curl -s -i http://127.0.0.1:9171/tickets -d {"subject":"Login fails & shows 500","priority":"high"}
+HTTP/1.1 422 Unprocessable Entity
+X-Powered-By: Express
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 193
+ETag: W/"c1-OP+2WodrDoI3rtDh86aVs5q/8Pw"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"Field 'subject' is required","receivedFields":["{\"subject\":\"Login fails "," shows 500\",\"priority\":\"high\"}"]}
+
+$ curl -s -i http://127.0.0.1:9171/tickets -d subject=Login&priority=high
+HTTP/1.1 201 Created
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 114
+ETag: W/"72-vBiLNYhl1WNIvl5AkGyfMX3qr1g"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"contentType":"application/x-www-form-urlencoded","body":{"subject":"Login","priority":"high"},"attachment":null}
+
+$ curl -s -i http://127.0.0.1:9171/tickets -H Content-Type: text/plain -d {"subject":"Login"}
+HTTP/1.1 415 Unsupported Media Type
+X-Powered-By: Express
+Accept: application/json, application/x-www-form-urlencoded, multipart/form-data
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 122
+ETag: W/"7a-wPA4N4Ep2hRMS2RfpTXxeJYoWY8"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Content-Type 'text/plain' is not supported"}
+
+$ curl -s -i http://127.0.0.1:9171/tickets -H Content-Type: multipart/form-data -d subject=Login
+HTTP/1.1 400 Bad Request
+X-Powered-By: Express
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 98
+ETag: W/"62-++LgN6Z0dvu2pzuQ+HLeVKWK40U"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"Multipart: Boundary not found"}
+
+$ curl -s -i http://127.0.0.1:9171/tickets --json {"subject":"Login",}
+HTTP/1.1 400 Bad Request
+X-Powered-By: Express
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 147
+ETag: W/"93-ejzQaDWzglTt5hl6byHWnQQAe1s"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Bad Request","status":400,"detail":"Expected double-quoted property name in JSON at position 19 (line 1 column 20)"}
+
+########## http://127.0.0.1:9172
+$ curl -s http://127.0.0.1:9172/tickets --json {"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"],"customer":{"id":"c-1042","plan":"pro"}}
+{"parsedAs":"json","ticket":{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"],"customer":{"id":"c-1042","plan":"pro"}}}
+
+$ curl -s http://127.0.0.1:9172/tickets/form --data-urlencode subject=Login fails & shows 500 -d priority=high -d tags=auth -d tags=web
+{"parsedAs":"form","ticket":{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"]}}
+
+$ curl -s http://127.0.0.1:9172/tickets/upload -F subject=Login fails & shows 500 -F priority=high -F attachment=@error.log;type=text/plain
+{"parsedAs":"multipart","subject":"Login fails & shows 500","priority":"high","attachment":{"filename":"error.log","contentType":"text/plain","size":20}}
+
+$ curl -s http://127.0.0.1:9172/tickets/form -d subject=Login -d customer[id]=c-1042 -d customer[plan]=pro
+{"parsedAs":"form","ticket":{"subject":"Login","priority":"normal","tags":[]}}
+
+# mistakes
+$ curl -s -i http://127.0.0.1:9172/tickets/form -d {"subject":"Login fails & shows 500","priority":"high"}
+HTTP/1.1 422 Unprocessable Content
+date: Mon, 05 Oct 2026 11:18:29 GMT
+server: uvicorn
+content-length: 193
+content-type: application/json
+
+{"detail":[{"type":"missing","loc":["body","subject"],"msg":"Field required","input":{"priority":"normal","tags":[],"{\"subject\":\"Login fails ":""," shows 500\",\"priority\":\"high\"}":""}}]}
+
+$ curl -s -i http://127.0.0.1:9172/tickets -d subject=Login&priority=high
+HTTP/1.1 422 Unprocessable Content
+date: Mon, 05 Oct 2026 11:18:29 GMT
+server: uvicorn
+content-length: 174
+content-type: application/json
+
+{"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"subject=Login&priority=high"}]}
+
+$ curl -s -i http://127.0.0.1:9172/tickets -H Content-Type: text/plain -d {"subject":"Login"}
+HTTP/1.1 422 Unprocessable Content
+date: Mon, 05 Oct 2026 11:18:29 GMT
+server: uvicorn
+content-length: 170
+content-type: application/json
+
+{"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"{\"subject\":\"Login\"}"}]}
+
+$ curl -s -i http://127.0.0.1:9172/tickets/upload -H Content-Type: multipart/form-data -d subject=Login
+HTTP/1.1 400 Bad Request
+date: Mon, 05 Oct 2026 11:18:29 GMT
+server: uvicorn
+content-length: 43
+content-type: application/json
+
+{"detail":"Missing boundary in multipart."}
+
+$ curl -s -i http://127.0.0.1:9172/tickets --json {"subject":"Login",}
+HTTP/1.1 422 Unprocessable Content
+date: Mon, 05 Oct 2026 11:18:29 GMT
+server: uvicorn
+content-length: 153
+content-type: application/json
+
+{"detail":[{"type":"json_invalid","loc":["body",18],"msg":"JSON decode error","input":{},"ctx":{"error":"Illegal trailing comma before end of object"}}]}
+
+########## http://127.0.0.1:9173
+$ curl -s http://127.0.0.1:9173/tickets --json {"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"],"customer":{"id":"c-1042","plan":"pro"}}
+{"parsedAs":"json","ticket":{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"],"customer":{"id":"c-1042","plan":"pro"}}}
+
+$ curl -s http://127.0.0.1:9173/tickets --data-urlencode subject=Login fails & shows 500 -d priority=high -d tags=auth -d tags=web
+{"parsedAs":"form","ticket":{"subject":"Login fails & shows 500","priority":"high","tags":["auth","web"]}}
+
+$ curl -s http://127.0.0.1:9173/tickets -F subject=Login fails & shows 500 -F priority=high -F attachment=@error.log;type=text/plain
+{"parsedAs":"multipart","ticket":{"subject":"Login fails & shows 500","priority":"high","tags":null},"attachment":{"contentType":"text/plain","size":20,"filename":"error.log"}}
+
+$ curl -s http://127.0.0.1:9173/tickets -d subject=Login -d customer[id]=c-1042 -d customer[plan]=pro
+{"parsedAs":"form","ticket":{"subject":"Login","priority":null,"tags":null}}
+
+# mistakes
+$ curl -s -i http://127.0.0.1:9173/tickets -d {"subject":"Login fails & shows 500","priority":"high"}
+HTTP/1.1 422 
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+
+{"detail":"Field 'subject' is required","instance":"/tickets","status":422,"title":"Unprocessable Content"}
+
+$ curl -s -i http://127.0.0.1:9173/tickets -d subject=Login&priority=high
+HTTP/1.1 201 
+Content-Type: application/json
+Content-Length: 78
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+
+{"parsedAs":"form","ticket":{"subject":"Login","priority":"high","tags":null}}
+
+$ curl -s -i http://127.0.0.1:9173/tickets -H Content-Type: text/plain -d {"subject":"Login"}
+HTTP/1.1 415 
+Accept: multipart/form-data, application/x-www-form-urlencoded, application/json
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+
+{"detail":"Content-Type 'text/plain' is not supported.","instance":"/tickets","status":415,"title":"Unsupported Media Type"}
+
+$ curl -s -i http://127.0.0.1:9173/tickets -H Content-Type: multipart/form-data -d subject=Login
+HTTP/1.1 400 
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: close
+
+{"detail":"the request was rejected because no multipart boundary was found","instance":"/tickets","status":400,"title":"Bad Request"}
+
+$ curl -s -i http://127.0.0.1:9173/tickets --json {"subject":"Login",}
+HTTP/1.1 400 
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: close
+
+{"detail":"Failed to read request","instance":"/tickets","status":400,"title":"Bad Request"}
+
+########## OAuth token endpoint (Express)
+$ curl -s -i http://127.0.0.1:9171/oauth/token -u ticket-cli:s3cret -d grant_type=client_credentials --data-urlencode scope=tickets:read tickets:write
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Cache-Control: no-store
+Content-Type: application/json; charset=utf-8
+Content-Length: 111
+ETag: W/"6f-CAC6Kj4eWm3XlMRwh16wlkknle8"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"access_token":"demo-token-7f3a","token_type":"Bearer","expires_in":3600,"scope":"tickets:read tickets:write"}
+
+$ curl -s -i http://127.0.0.1:9171/oauth/token -u ticket-cli:s3cret --json {"grant_type":"client_credentials"}
+HTTP/1.1 400 Bad Request
+X-Powered-By: Express
+Cache-Control: no-store
+Content-Type: application/json; charset=utf-8
+Content-Length: 109
+ETag: W/"6d-CVP+ir09WbbyAP0cps+AScx8lHk"
+Date: Mon, 05 Oct 2026 11:18:29 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"invalid_request","error_description":"Send the token request as application/x-www-form-urlencoded"}
+
+########## Nested JSON plus a file in one multipart request (Spring Boot, then Express)
+$ curl -s http://127.0.0.1:9173/tickets/with-attachment -F ticket={"subject":"Login fails & shows 500","tags":["auth"],"customer":{"id":"c-1042","plan":"pro"}};type=application/json -F attachment=@error.log;type=text/plain
+{"parsedAs":"multipart with a JSON part","ticket":{"subject":"Login fails & shows 500","priority":null,"tags":["auth"],"customer":{"id":"c-1042","plan":"pro"}},"attachmentSize":20}
+
+$ curl -s http://127.0.0.1:9171/tickets/with-attachment -F ticket={"subject":"Login fails & shows 500","tags":["auth"],"customer":{"id":"c-1042","plan":"pro"}};type=application/json -F attachment=@error.log;type=text/plain
+{"parsedAs":"multipart with a JSON part","ticket":{"subject":"Login fails & shows 500","tags":["auth"],"customer":{"id":"c-1042","plan":"pro"}},"attachmentSize":20}
+
+===== 3. node mistakes_fetch.mjs (Express)
+JSON string, no header: 415 {"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Content-Type 'text/plain;charset=UTF-8' is not supported"}
+FormData, manual header: 400 {"type":"about:blank","title":"Bad Request","status":400,"detail":"Multipart: Boundary not found"}
+FormData, no header: 201 {"contentType":"multipart/form-data; boundary=----formdata-undici-073541234277","body":{"subject":"Login fails & shows 500"},"attachment":null}
+JSON with header: 201 {"contentType":"application/json","body":{"subject":"Login fails & shows 500","priority":"high"},"attachment":null}
+
+===== 4. python mistakes_requests.py (Express)
+data=json.dumps(): None -> 415
+  {"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Content-Type '(none)' is not supported"}
+data= nested dict: subject=Login&customer=id&customer=plan
+  {"contentType":"application/x-www-form-urlencoded","body":{"subject":"Login","customer":["id","plan"]},"attachment":null}
+json=: application/json -> 201
+  {"contentType":"application/json","body":{"subject":"Login","customer":{"id":"c-1042","plan":"pro"}},"attachment":null}
+
+===== 5. python sizes.py
+Text fields only:
+  x-www-form-urlencoded: 47
+  application/json:      55
+  multipart/form-data:   242
+Text fields plus a 30,000-byte binary file:
+  x-www-form-urlencoded, raw bytes: 74259
+  x-www-form-urlencoded, Base64:    42679
+  application/json, Base64:         40071
+  multipart/form-data, raw bytes:   30395
+
+===== 6. node json_part_fetch.mjs (Express /tickets/with-attachment)
+201 {"parsedAs":"multipart with a JSON part","ticket":{"subject":"Login fails & shows 500","tags":["auth"],"customer":{"id":"c-1042","plan":"pro"}},"attachmentSize":20}
+
+# the same script pointed at wire_server.py (port 9170): the Blob part on the wire
+Content-Disposition: form-data; name="ticket"; filename="blob"
+Content-Type: application/json
+
+{"subject":"Login fails & shows 500","tags":["auth"],"customer":{"id":"c-1042","plan":"pro"}}
+
+===== 7. Spring Boot default without MultipartErrors.java (earlier run, log excerpt)
+$ curl -s -i http://127.0.0.1:9173/tickets -H "Content-Type: multipart/form-data" -d subject=Login
+HTTP/1.1 500
+{"timestamp":"2026-10-05T10:50:54.582Z","status":500,"error":"Internal Server Error","path":"/tickets"}
+org.apache.tomcat.util.http.fileupload.FileUploadException: the request was rejected because no multipart boundary was found
+
+===== 8. Scratch run: Express 5 default express.urlencoded() (extended: false) uses qs with depth 0
+$ node -e (qs.parse with the body-parser 2.3.0 options for extended: false)
+{"subject":"Login","customer[id]":"c-1042","customer[plan]":"pro"}
+===== 9. Earlier runs during development (same requests, before the fixes in the final code)
+# Spring Boot before requireSubject() was added: a JSON text sent with curl -d binds to the form method with null fields
+$ curl -s -i http://127.0.0.1:9173/tickets -d '{"subject":"Login fails & shows 500","priority":"high"}'
+HTTP/1.1 201
+{"parsedAs":"form","ticket":{"subject":null,"priority":null,"tags":null}}
+
+# Express before the 422 check: the same body is accepted with JSON fragments as field names
+$ curl -s -i http://127.0.0.1:9171/tickets -d '{"subject":"Login fails & shows 500","priority":"high"}'
+HTTP/1.1 201 Created
+{"contentType":"application/x-www-form-urlencoded","body":{"{\"subject\":\"Login fails ":""," shows 500\",\"priority\":\"high\"}":""},"attachment":null}
+
+# Express before parseMultipart() set a status: the multer error has no status, so the error handler fell back to 500
+$ curl -s -i http://127.0.0.1:9171/tickets -H "Content-Type: multipart/form-data" -d 'subject=Login'
+HTTP/1.1 500 Internal Server Error
+{"type":"about:blank","title":"Bad Request","status":500,"detail":"Multipart: Boundary not found"}
+
+# Express /tickets/with-attachment first version used upload.single("attachment"): a browser Blob part has filename="blob", so multer saw a second file field
+$ node json_part_fetch.mjs
+400 {"type":"about:blank","title":"Bad Request","status":400,"detail":"Unexpected file field"}

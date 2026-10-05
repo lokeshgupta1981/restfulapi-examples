@@ -1,0 +1,9 @@
+{
+  // tsc reads this file as JSON with Comments
+  "compilerOptions": {
+    "target": "es2022",
+    "strict": true, /* keep strict mode on */
+    "outDir": "dist",
+  },
+  "include": ["src"],
+}

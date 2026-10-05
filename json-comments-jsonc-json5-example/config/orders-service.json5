@@ -1,0 +1,13 @@
+// Settings for the orders service (JSON5)
+{
+  port: 8080,
+  /* The payment provider's sandbox URL.
+     Switch to the live URL only in production. */
+  paymentUrl: 'https://sandbox.pay.example.com/v2',
+  retry: {
+    maxAttempts: 3,   // give up after the third failure
+    backoffMs: 200,
+  },
+  featureFlags: 0x0F,   // hex numbers are allowed
+  discountRate: .15,    // so is a leading decimal point
+}

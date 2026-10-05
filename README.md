@@ -32,3 +32,7 @@ and each folder has its own README with the versions used and the run commands.
 | [asyncapi-vs-openapi-example](asyncapi-vs-openapi-example/) | [AsyncAPI vs OpenAPI](https://restfulapi.net/asyncapi-vs-openapi/) |
 | [openapi-mock-server-example](openapi-mock-server-example/) | [Mock a REST API from an OpenAPI Document](https://restfulapi.net/openapi-mock-server/) |
 | [rest-api-interview-questions-example](rest-api-interview-questions-example/) | [REST API Interview Questions and Answers](https://restfulapi.net/rest-api-interview-questions/) |
+| [json-lines-jsonl-ndjson-example](json-lines-jsonl-ndjson-example/) | [JSON Lines (JSONL) and NDJSON Explained](https://restfulapi.net/json-lines-jsonl-ndjson/) |
+| [json-comments-jsonc-json5-example](json-comments-jsonc-json5-example/) | [Comments in JSON: JSONC and JSON5](https://restfulapi.net/json-comments-jsonc-json5/) |
+| [form-urlencoded-vs-multipart-vs-json-example](form-urlencoded-vs-multipart-vs-json-example/) | [x-www-form-urlencoded vs multipart/form-data vs JSON](https://restfulapi.net/form-urlencoded-vs-multipart-vs-json/) |
+| [application-json-content-type-example](application-json-content-type-example/) | [application/json: The JSON Content-Type](https://restfulapi.net/application-json-content-type/) |

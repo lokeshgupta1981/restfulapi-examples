@@ -1,0 +1,4 @@
+{"id":"ord_1001","customer":"Ana","total":42.5,"status":"paid"}
+{"id":"ord_1002","customer":"Bo","total":18.0,"status":"pending"}
+{"id":"ord_1003","customer":"Chloé","total":99.9,"status":"paid","note":"Leave at the door.\nRing twice."}
+{"id":"ord_1004","customer":"Dev","total":7.25,"status":"paid"}
