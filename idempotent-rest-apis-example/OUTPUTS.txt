@@ -1,0 +1,120 @@
+Output of a real run, Python 3.13.16, fastapi 0.143.0, uvicorn 0.54.0, on 2026-10-09.
+The server was restarted with an empty database (orders.db deleted) before each script.
+
+########## ./methods.sh
+== PUT twice: same final state, same ETag ==
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -d {"items":["book"],"status":"new"}
+HTTP/1.1 201 Created
+etag: "v1"
+location: /orders/ord_42
+{"items":["book"],"status":"new"}
+
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -d {"items":["book"],"status":"new"}
+HTTP/1.1 200 OK
+etag: "v1"
+{"items":["book"],"status":"new"}
+
+== DELETE twice: the order is gone after both calls ==
+$ curl -X DELETE http://localhost:8000/orders/ord_42
+HTTP/1.1 204 No Content
+
+$ curl -X DELETE http://localhost:8000/orders/ord_42
+HTTP/1.1 404 Not Found
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Order ord_42 does not exist."}
+
+== POST twice without a key: two orders ==
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -d {"items":["pen"]}
+HTTP/1.1 201 Created
+etag: "v1"
+location: /orders/ord_1001
+{"id":"ord_1001","items":["pen"],"status":"new"}
+
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -d {"items":["pen"]}
+HTTP/1.1 201 Created
+etag: "v1"
+location: /orders/ord_1002
+{"id":"ord_1002","items":["pen"],"status":"new"}
+
+== POST twice with the same Idempotency-Key: one order ==
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -H Idempotency-Key: "9b2f6a1e-4c1d-4f7a-9a51-2f3c8e0d7b11" -d {"items":["lamp"]}
+HTTP/1.1 201 Created
+etag: "v1"
+location: /orders/ord_1003
+{"id":"ord_1003","items":["lamp"],"status":"new"}
+
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -H Idempotency-Key: "9b2f6a1e-4c1d-4f7a-9a51-2f3c8e0d7b11" -d {"items":["lamp"]}
+HTTP/1.1 201 Created
+location: /orders/ord_1003
+idempotent-replayed: true
+{"id":"ord_1003","items":["lamp"],"status":"new"}
+
+== Same key, different body ==
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -H Idempotency-Key: "9b2f6a1e-4c1d-4f7a-9a51-2f3c8e0d7b11" -d {"items":["desk"]}
+HTTP/1.1 422 Unprocessable Content
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"This Idempotency-Key was already used with a different request body."}
+
+== All orders ==
+{"count":3,"ids":["ord_1001","ord_1002","ord_1003"]}
+########## ./patch.sh
+== replace status, sent twice: same result ==
+$ curl -X PATCH http://localhost:8000/orders/ord_7 -H Content-Type: application/json-patch+json -d [{"op":"replace","path":"/status","value":"paid"}]
+HTTP/1.1 200 OK
+etag: "v2"
+{"items":["book"],"status":"paid"}
+
+$ curl -X PATCH http://localhost:8000/orders/ord_7 -H Content-Type: application/json-patch+json -d [{"op":"replace","path":"/status","value":"paid"}]
+HTTP/1.1 200 OK
+etag: "v2"
+{"items":["book"],"status":"paid"}
+
+== add to the end of items, sent twice: a second pen ==
+$ curl -X PATCH http://localhost:8000/orders/ord_7 -H Content-Type: application/json-patch+json -d [{"op":"add","path":"/items/-","value":"pen"}]
+HTTP/1.1 200 OK
+etag: "v3"
+{"items":["book","pen"],"status":"paid"}
+
+$ curl -X PATCH http://localhost:8000/orders/ord_7 -H Content-Type: application/json-patch+json -d [{"op":"add","path":"/items/-","value":"pen"}]
+HTTP/1.1 200 OK
+etag: "v4"
+{"items":["book","pen","pen"],"status":"paid"}
+
+== add with If-Match, sent twice: the retry gets 412 ==
+$ curl -X PATCH http://localhost:8000/orders/ord_7 -H Content-Type: application/json-patch+json -H If-Match: "v4" -d [{"op":"add","path":"/items/-","value":"lamp"}]
+HTTP/1.1 200 OK
+etag: "v5"
+{"items":["book","pen","pen","lamp"],"status":"paid"}
+
+$ curl -X PATCH http://localhost:8000/orders/ord_7 -H Content-Type: application/json-patch+json -H If-Match: "v4" -d [{"op":"add","path":"/items/-","value":"lamp"}]
+HTTP/1.1 412 Precondition Failed
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"The order changed. Current ETag is \"v5\"."}
+
+
+########## ./test_idempotency.sh
+before: {"count":0,"ids":[]}
+after:  {"count":1,"ids":["ord_1001"]}
+PASS: one new order
+
+########## retry_client.py (server started with SLOW_CREATE_SECONDS=2)
+$ python retry_client.py 
+attempt 1: no response after 1 s
+attempt 2: no response after 1 s
+attempt 3: no response after 1 s
+attempt 4: no response after 1 s
+attempt 5: no response after 1 s
+gave up after 5 attempts
+$ curl -s http://localhost:8000/orders
+{"count":5,"ids":["ord_1001","ord_1002","ord_1003","ord_1004","ord_1005"]}
+$ python retry_client.py --key
+attempt 1: no response after 1 s
+attempt 2: HTTP 409 Conflict
+attempt 3: HTTP 409 Conflict
+attempt 4: HTTP 201 ord_1001 replayed=true
+$ curl -s http://localhost:8000/orders
+{"count":1,"ids":["ord_1001"]}
+$ python retry_client.py --key   (server not running)
+attempt 1: connection error [Errno 111] Connection refused
+attempt 2: connection error [Errno 111] Connection refused
+attempt 3: connection error [Errno 111] Connection refused
+attempt 4: connection error [Errno 111] Connection refused
+attempt 5: connection error [Errno 111] Connection refused
+gave up after 5 attempts
