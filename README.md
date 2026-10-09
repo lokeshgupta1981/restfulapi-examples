@@ -42,3 +42,4 @@ and each folder has its own README with the versions used and the run commands.
 | [hmac-authentication-example](hmac-authentication-example/) | [HMAC Authentication: Signing API Requests and Webhooks](https://restfulapi.net/hmac-authentication/) |
 | [http-status-406-not-acceptable-example](http-status-406-not-acceptable-example/) | [HTTP 406 Not Acceptable](https://restfulapi.net/http-status-406-not-acceptable/) |
 | [http-status-207-multi-status-example](http-status-207-multi-status-example/) | [HTTP 207 Multi-Status](https://restfulapi.net/http-status-207-multi-status/) |
+| [idempotent-rest-apis-example](idempotent-rest-apis-example/) | [Idempotent REST API](https://restfulapi.net/idempotent-rest-apis/) |
