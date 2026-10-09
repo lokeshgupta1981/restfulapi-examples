@@ -44,6 +44,7 @@ location: /orders/ord_1003
 
 $ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -H Idempotency-Key: "9b2f6a1e-4c1d-4f7a-9a51-2f3c8e0d7b11" -d {"items":["lamp"]}
 HTTP/1.1 201 Created
+etag: "v1"
 location: /orders/ord_1003
 idempotent-replayed: true
 {"id":"ord_1003","items":["lamp"],"status":"new"}
