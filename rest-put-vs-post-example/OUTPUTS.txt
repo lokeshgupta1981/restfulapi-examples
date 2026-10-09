@@ -1,0 +1,78 @@
+Output of a real run of ./demo.sh, Python 3.13.16, fastapi 0.143.0, uvicorn 0.54.0, on 2026-10-09 (server freshly started).
+
+== 1. POST to the collection, sent twice: two orders with server-chosen ids ==
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -d {"customer":"c-7","items":["book"]}
+HTTP/1.1 201 Created
+location: /orders/ord_1001
+{"id":"ord_1001","customer":"c-7","items":["book"],"status":"new"}
+
+$ curl -X POST http://localhost:8000/orders -H Content-Type: application/json -d {"customer":"c-7","items":["book"]}
+HTTP/1.1 201 Created
+location: /orders/ord_1002
+{"id":"ord_1002","customer":"c-7","items":["book"],"status":"new"}
+
+== 2. PUT to a client-chosen URI, sent twice: created once, then replaced with the same state ==
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -d {"customer":"c-9","items":["lamp"],"status":"new","note":"gift wrap"}
+HTTP/1.1 201 Created
+etag: "v1"
+location: /orders/ord_42
+{"customer":"c-9","items":["lamp"],"status":"new","note":"gift wrap"}
+
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -d {"customer":"c-9","items":["lamp"],"status":"new","note":"gift wrap"}
+HTTP/1.1 200 OK
+etag: "v1"
+{"customer":"c-9","items":["lamp"],"status":"new","note":"gift wrap"}
+
+== 3. PUT without the note field: the note is gone, because PUT replaces the whole order ==
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -d {"customer":"c-9","items":["lamp","pen"],"status":"new"}
+HTTP/1.1 200 OK
+etag: "v2"
+{"customer":"c-9","items":["lamp","pen"],"status":"new"}
+
+$ curl http://localhost:8000/orders/ord_42
+HTTP/1.1 200 OK
+etag: "v2"
+{"customer":"c-9","items":["lamp","pen"],"status":"new"}
+
+== 4. PUT with only one field: rejected, PUT needs the full order ==
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -d {"items":["lamp"]}
+HTTP/1.1 422 Unprocessable Content
+{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"PUT needs the full order. Missing fields: customer."}
+
+== 5. Create-only PUT with If-None-Match: * ==
+$ curl -X PUT http://localhost:8000/orders/ord_43 -H Content-Type: application/json -H If-None-Match: * -d {"customer":"c-1","items":["desk"],"status":"new"}
+HTTP/1.1 201 Created
+etag: "v1"
+location: /orders/ord_43
+{"customer":"c-1","items":["desk"],"status":"new"}
+
+$ curl -X PUT http://localhost:8000/orders/ord_43 -H Content-Type: application/json -H If-None-Match: * -d {"customer":"c-2","items":["chair"],"status":"new"}
+HTTP/1.1 412 Precondition Failed
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"Order ord_43 already exists."}
+
+== 6. Update with If-Match, sent twice: the second request has a stale ETag and gets 412 ==
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -H If-Match: "v2" -d {"customer":"c-9","items":["lamp"],"status":"paid"}
+HTTP/1.1 200 OK
+etag: "v3"
+{"customer":"c-9","items":["lamp"],"status":"paid"}
+
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -H If-Match: "v2" -d {"customer":"c-9","items":["lamp"],"status":"paid"}
+HTTP/1.1 412 Precondition Failed
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"The order changed since the client read it."}
+
+== 7. If-Match: * (any current version) and If-None-Match with the current ETag ==
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -H If-Match: * -d {"customer":"c-9","items":["lamp"],"status":"paid"}
+HTTP/1.1 200 OK
+etag: "v3"
+{"customer":"c-9","items":["lamp"],"status":"paid"}
+
+$ curl -X PUT http://localhost:8000/orders/ord_42 -H Content-Type: application/json -H If-None-Match: "v3" -d {"customer":"c-9","items":["desk"],"status":"paid"}
+HTTP/1.1 412 Precondition Failed
+{"type":"about:blank","title":"Precondition Failed","status":412,"detail":"The current ETag matches If-None-Match."}
+
+== 8. POST for an action ==
+$ curl -X POST http://localhost:8000/orders/ord_42/cancel
+HTTP/1.1 200 OK
+etag: "v4"
+{"customer":"c-9","items":["lamp"],"status":"cancelled"}
+
