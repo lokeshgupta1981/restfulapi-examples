@@ -46,3 +46,4 @@ and each folder has its own README with the versions used and the run commands.
 | [rest-put-vs-post-example](rest-put-vs-post-example/) | [HTTP PUT vs. POST](https://restfulapi.net/rest-put-vs-post/) |
 | [llm-structured-outputs-json-schema-example](llm-structured-outputs-json-schema-example/) | [LLM Structured Outputs with JSON Schema](https://restfulapi.net/llm-structured-outputs-json-schema/) |
 | [mcp-security-example](mcp-security-example/) | [MCP Security Risks and Best Practices](https://restfulapi.net/mcp-security/) |
+| [ai-gateway-vs-mcp-gateway-example](ai-gateway-vs-mcp-gateway-example/) | [AI Gateway vs MCP Gateway](https://restfulapi.net/ai-gateway-vs-mcp-gateway/) |
