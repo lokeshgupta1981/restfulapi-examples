@@ -62,3 +62,4 @@ and each folder has its own README with the versions used and the run commands.
 | [acp-example](acp-example/) | [Agent Client Protocol (ACP) Explained](https://restfulapi.net/agent-client-protocol/) |
 | [llms-txt-example](llms-txt-example/) | [llms.txt for API Documentation](https://restfulapi.net/llms-txt/) |
 | [vibe-coding-security-example](vibe-coding-security-example/) | [API Security Checklist for AI-Generated Code](https://restfulapi.net/vibe-coding-api-security-checklist/) |
+| [protected-resource-metadata-example](protected-resource-metadata-example/) | [OAuth Protected Resource Metadata (RFC 9728)](https://restfulapi.net/oauth-protected-resource-metadata/) |
