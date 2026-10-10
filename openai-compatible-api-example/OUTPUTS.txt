@@ -1,0 +1,79 @@
+######## switch_demo.py
+https://api.openai.com/v1/
+http://localhost:11434/v1/
+http://127.0.0.1:8000/v1/
+You said: HELLO
+
+######## strict server
+Checking http://127.0.0.1:8000/v1 with model echo-1
+
+PASS  GET /models lists the model        2 models: echo-1, echo-1-mini
+PASS  POST /chat/completions             finish_reason=stop, total_tokens=4
+PASS  stream returns text chunks         5 chunks, text='You said: HELLO'
+PASS  raw stream ends with data: [DONE]  Content-Type=text/event-stream, last line='data: [DONE]'
+PASS  stream_options.include_usage       usage in last chunk, empty choices (OpenAI shape), total_tokens=4
+PASS  unknown model returns 404          NotFoundError, code=model_not_found, param=model
+PASS  bad API key returns 401            AuthenticationError, code=invalid_api_key
+PASS  unsupported n=2 is reported        BadRequestError, param=n, message='This server supports only n=1.'
+PASS  429 has Retry-After, SDK retries   Retry-After=10, remaining=0, retried call succeeded after 10s
+
+9 passed, 0 warnings, 0 failed, 0 skipped
+
+######## lenient server (LENIENT=1)
+Checking http://127.0.0.1:8001/v1 with model echo-1
+
+PASS  GET /models lists the model        2 models: echo-1, echo-1-mini
+PASS  POST /chat/completions             finish_reason=stop, total_tokens=4
+PASS  stream returns text chunks         5 chunks, text='You said: HELLO'
+PASS  raw stream ends with data: [DONE]  Content-Type=text/event-stream, last line='data: [DONE]'
+PASS  stream_options.include_usage       usage in last chunk, empty choices (OpenAI shape), total_tokens=4
+PASS  unknown model returns 404          NotFoundError, code=model_not_found, param=model
+PASS  bad API key returns 401            AuthenticationError, code=invalid_api_key
+WARN  unsupported n=2 is reported        accepted and returned 1 choice(s), the parameter was ignored
+PASS  429 has Retry-After, SDK retries   Retry-After=10, remaining=0, retried call succeeded after 10s
+
+8 passed, 1 warnings, 0 failed, 0 skipped
+
+######## wire.sh
+== GET /v1/models
+{
+    "object": "list",
+    "data": [
+        {
+            "id": "echo-1",
+            "object": "model",
+            "created": 1767225600,
+            "owned_by": "demo"
+        },
+        {
+            "id": "echo-1-mini",
+            "object": "model",
+            "created": 1767225600,
+            "owned_by": "demo"
+        }
+    ]
+}
+
+== POST /v1/chat/completions with an unknown model
+HTTP/1.1 404 Not Found
+content-length: 136
+content-type: application/json
+
+{"error":{"message":"The model 'no-such-model' does not exist","type":"invalid_request_error","param":"model","code":"model_not_found"}}
+
+
+== POST /v1/chat/completions with stream and include_usage
+data: {"id": "chatcmpl-236ea49e7925", "object": "chat.completion.chunk", "created": 1791605619, "model": "echo-1", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}], "usage": null}
+
+data: {"id": "chatcmpl-236ea49e7925", "object": "chat.completion.chunk", "created": 1791605619, "model": "echo-1", "choices": [{"index": 0, "delta": {"content": "You "}, "finish_reason": null}], "usage": null}
+
+data: {"id": "chatcmpl-236ea49e7925", "object": "chat.completion.chunk", "created": 1791605619, "model": "echo-1", "choices": [{"index": 0, "delta": {"content": "said: "}, "finish_reason": null}], "usage": null}
+
+data: {"id": "chatcmpl-236ea49e7925", "object": "chat.completion.chunk", "created": 1791605619, "model": "echo-1", "choices": [{"index": 0, "delta": {"content": "HI"}, "finish_reason": null}], "usage": null}
+
+data: {"id": "chatcmpl-236ea49e7925", "object": "chat.completion.chunk", "created": 1791605619, "model": "echo-1", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}], "usage": null}
+
+data: {"id": "chatcmpl-236ea49e7925", "object": "chat.completion.chunk", "created": 1791605619, "model": "echo-1", "choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 3, "total_tokens": 4}}
+
+data: [DONE]
+
