@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "description": "Short name of the event"},
+          "kind": {"type": "string", "enum": ["meeting", "call", "deadline"]},
+          "date": {"type": "string", "format": "date", "description": "ISO date, for example 2026-10-14"},
+          "start_time": {"type": ["string", "null"], "description": "24-hour time such as 15:00, or null if the email gives no time"},
+          "attendees": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["title", "kind", "date", "start_time", "attendees"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["events"],
+  "additionalProperties": false
+}
