@@ -1,0 +1,188 @@
+======== 1. Discover the server
+--> server/discover {}
+<-- HTTP 200 result {
+      "supportedVersions": [
+        "2026-07-28"
+      ],
+      "capabilities": {
+        "tools": {},
+        "extensions": {
+          "io.modelcontextprotocol/tasks": {}
+        }
+      },
+      "_meta": {
+        "io.modelcontextprotocol/serverInfo": {
+          "name": "invoice-exports",
+          "version": "1.0.0"
+        }
+      },
+      "resultType": "complete"
+    }
+
+======== 2. A small export finishes inside the tools/call request
+--> tools/call {"name": "export_invoices", "arguments": {"year": 2026, "month": 9}}
+<-- HTTP 200 result {
+      "content": [
+        {
+          "type": "text",
+          "text": "Exported 1184 invoices to invoices-2026-09.csv."
+        }
+      ],
+      "structuredContent": {
+        "file": "invoices-2026-09.csv",
+        "rows": 1184,
+        "customerEmails": false
+      },
+      "isError": false,
+      "resultType": "complete"
+    }
+
+======== 3. A year export needs the tasks extension
+--> tools/call {"name": "export_invoices", "arguments": {"year": 2025}}
+<-- HTTP 400 error {
+      "code": -32021,
+      "message": "Missing required client capability",
+      "data": {
+        "requiredCapabilities": {
+          "extensions": {
+            "io.modelcontextprotocol/tasks": {}
+          }
+        }
+      }
+    }
+
+======== 4. The server returns a task, the client polls and answers the input request
+--> tools/call {"name": "export_invoices", "arguments": {"year": 2025}}
+<-- HTTP 200 result {
+      "taskId": "MnXVEpN00KcqmbDZE3T8fw",
+      "status": "working",
+      "createdAt": "2026-10-10T05:38:38Z",
+      "lastUpdatedAt": "2026-10-10T05:38:38Z",
+      "ttlMs": 600000,
+      "pollIntervalMs": 1000,
+      "statusMessage": "Export started.",
+      "resultType": "task"
+    }
+
+--> tasks/get {"taskId": "MnXVEpN00KcqmbDZE3T8fw"}
+<-- HTTP 200 result {
+      "taskId": "MnXVEpN00KcqmbDZE3T8fw",
+      "status": "working",
+      "createdAt": "2026-10-10T05:38:38Z",
+      "lastUpdatedAt": "2026-10-10T05:38:39Z",
+      "ttlMs": 600000,
+      "pollIntervalMs": 1000,
+      "statusMessage": "Exported 2 of 12 months.",
+      "resultType": "complete"
+    }
+
+    tasks/get -> working: Exported 2 of 12 months.
+    tasks/get -> working: Exported 5 of 12 months.
+    tasks/get -> input_required: Waiting for the user to decide about customer emails.
+    input_required task: {
+      "taskId": "MnXVEpN00KcqmbDZE3T8fw",
+      "status": "input_required",
+      "createdAt": "2026-10-10T05:38:38Z",
+      "lastUpdatedAt": "2026-10-10T05:38:41Z",
+      "ttlMs": 600000,
+      "pollIntervalMs": 1000,
+      "statusMessage": "Waiting for the user to decide about customer emails.",
+      "inputRequests": {
+        "include_emails": {
+          "method": "elicitation/create",
+          "params": {
+            "mode": "form",
+            "message": "The 2025 export has reached July. Include customer email addresses in the file?",
+            "requestedSchema": {
+              "type": "object",
+              "properties": {
+                "include": {
+                  "type": "boolean",
+                  "title": "Include customer emails"
+                }
+              },
+              "required": [
+                "include"
+              ]
+            }
+          }
+        }
+      },
+      "resultType": "complete"
+    }
+    input request 'include_emails': The 2025 export has reached July. Include customer email addresses in the file?
+--> tasks/update {"taskId": "MnXVEpN00KcqmbDZE3T8fw", "inputResponses": {"include_emails": {"action": "accept", "content": {"include": false}}}}
+<-- HTTP 200 result {
+      "resultType": "complete"
+    }
+
+    tasks/get -> working: Exported 8 of 12 months.
+    tasks/get -> working: Exported 10 of 12 months.
+    tasks/get -> completed: Exported 12 of 12 months.
+    final task: {
+      "taskId": "MnXVEpN00KcqmbDZE3T8fw",
+      "status": "completed",
+      "createdAt": "2026-10-10T05:38:38Z",
+      "lastUpdatedAt": "2026-10-10T05:38:44Z",
+      "ttlMs": 600000,
+      "pollIntervalMs": 1000,
+      "statusMessage": "Exported 12 of 12 months.",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Exported 14208 invoices to invoices-2025.csv."
+          }
+        ],
+        "structuredContent": {
+          "file": "invoices-2025.csv",
+          "rows": 14208,
+          "customerEmails": false
+        },
+        "isError": false
+      },
+      "resultType": "complete"
+    }
+
+======== 5. Another user cannot read the task
+--> tasks/get {"taskId": "MnXVEpN00KcqmbDZE3T8fw"}
+<-- HTTP 200 error {
+      "code": -32602,
+      "message": "Failed to retrieve task: Task not found"
+    }
+
+======== 6. Cancel a running task
+--> tasks/cancel {"taskId": "0WxAXlWcC_FqQlB3YVFnkA"}
+<-- HTTP 200 result {
+      "resultType": "complete"
+    }
+
+    tasks/get -> working: Exported 2 of 12 months.
+    tasks/get -> cancelled: Cancelled after 3 of 12 months.
+
+======== 7. A JSON-RPC error inside the job ends the task as failed
+    tasks/get -> working: Exported 0 of 12 months.
+    tasks/get -> working: Exported 2 of 12 months.
+    tasks/get -> failed: Export stopped at 2019-04, the archive did not respond.
+    error: {"code": -32603, "message": "Archive storage for 2019 is unavailable"}
+
+======== 8. A tool error is a normal tool result with isError
+--> tools/call {"name": "export_invoices", "arguments": {"year": 2031}}
+<-- HTTP 200 result {
+      "content": [
+        {
+          "type": "text",
+          "text": "No invoices exist for year 2031."
+        }
+      ],
+      "isError": true,
+      "resultType": "complete"
+    }
+
+======== 9. An unknown task id
+--> tasks/get {"taskId": "no-such-task"}
+<-- HTTP 200 error {
+      "code": -32602,
+      "message": "Failed to retrieve task: Task not found"
+    }
+
