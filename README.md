@@ -48,3 +48,4 @@ and each folder has its own README with the versions used and the run commands.
 | [mcp-security-example](mcp-security-example/) | [MCP Security Risks and Best Practices](https://restfulapi.net/mcp-security/) |
 | [ai-gateway-vs-mcp-gateway-example](ai-gateway-vs-mcp-gateway-example/) | [AI Gateway vs MCP Gateway](https://restfulapi.net/ai-gateway-vs-mcp-gateway/) |
 | [mcp-transports-example](mcp-transports-example/) | [MCP Transports, stdio vs Streamable HTTP](https://restfulapi.net/mcp-transports-stdio-vs-streamable-http/) |
+| [agent-skills-vs-mcp-example](agent-skills-vs-mcp-example/) | [Agent Skills vs MCP](https://restfulapi.net/agent-skills-vs-mcp/) |
