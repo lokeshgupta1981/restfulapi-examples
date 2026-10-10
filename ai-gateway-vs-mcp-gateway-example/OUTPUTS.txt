@@ -1,0 +1,54 @@
+Run: ./run_demo.sh on a clean venv. Python 3.13.16, fastapi 0.143.0, uvicorn 0.54.0, date 2026-10-10. Retry-After depends on the second of the minute when case 3 runs.
+
+== AI gateway 1. Support team calls the alias fast ==
+$ python demo.py chat vk-support-123 fast 'Customer says the invoice total is wrong.'
+HTTP 200
+X-Gateway-Provider: alpha
+answer: [alpha/alpha-mini] Summary: Customer says the invoice total is wrong
+usage: {'prompt_tokens': 11, 'completion_tokens': 18, 'total_tokens': 29}
+
+== AI gateway 2. Provider alpha fails, the gateway falls back to beta ==
+$ python demo.py chat vk-support-123 fast 'Refund request for order 1042.'
+HTTP 200
+X-Gateway-Provider: beta
+answer: [beta/beta-small] Summary: Refund request for order 1042.
+usage: {'prompt_tokens': 8, 'completion_tokens': 15, 'total_tokens': 23}
+
+== AI gateway 3. Support team uses up its token budget ==
+$ python demo.py chat vk-support-123 fast 'Please summarize the full conversation history of this customer account for me.'
+HTTP 429
+Retry-After: 12
+error: {'message': 'token budget for this minute is used up', 'type': 'rate_limit_error'}
+
+== AI gateway 4. Support team asks for a model it may not use ==
+$ python demo.py chat vk-support-123 smart 'Draft a reply.'
+HTTP 403
+error: {'message': 'team support may not use model smart', 'type': 'permission_error'}
+
+== MCP gateway 1. Each team sees only its tools ==
+$ python demo.py tools mcp-support-token
+HTTP 200
+tools: crm__search_customers, tickets__get_ticket
+cacheScope: private
+
+$ python demo.py tools mcp-admin-token
+HTTP 200
+tools: crm__search_customers, crm__delete_customer, tickets__get_ticket
+cacheScope: private
+
+== MCP gateway 2. Support calls an allowed tool and a hidden tool ==
+$ python demo.py call mcp-support-token crm__search_customers '{"query": "Ana"}'
+HTTP 200
+{"resultType": "complete", "content": [{"type": "text", "text": "crm.search_customers ran with {'query': 'Ana'}"}], "isError": false}
+
+$ python demo.py call mcp-support-token crm__delete_customer '{"id": "c-7"}'
+HTTP 200
+{"code": -32602, "message": "Unknown tool: crm__delete_customer"}
+
+== Gateway log ==
+{"gateway": "ai", "team": "support", "model": "fast", "provider": "alpha", "tokens": 29, "cost_usd": "0.000012"}
+{"gateway": "ai", "team": "support", "model": "fast", "provider": "alpha", "result": "503, trying next provider"}
+{"gateway": "ai", "team": "support", "model": "fast", "provider": "beta", "tokens": 23, "cost_usd": "0.000014"}
+{"gateway": "ai", "team": "support", "model": "fast", "result": "429", "used": 52}
+{"gateway": "mcp", "team": "support", "tool": "crm__search_customers", "arguments": {"query": "Ana"}, "result": "ok"}
+{"gateway": "mcp", "team": "support", "tool": "crm__delete_customer", "result": "denied"}
