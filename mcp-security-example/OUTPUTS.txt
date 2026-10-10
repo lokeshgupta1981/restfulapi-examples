@@ -1,0 +1,56 @@
+Run: ./run_demo.sh on a clean venv. Python 3.13.16, fastapi 0.143.0, uvicorn 0.54.0, PyJWT 2.15.1, date 2026-10-10.
+
+== 1. The user approves the tools, the client pins their hashes ==
+$ python client_guard.py pin --token $ALICE
+pinned create_cart sha256:5e4690f644f7
+pinned add_item sha256:ef60f652b776
+pinned checkout sha256:74abff65765e
+(exit code 0)
+
+$ python client_guard.py check --token $ALICE
+OK       create_cart
+OK       add_item
+OK       checkout
+(exit code 0)
+
+== 2. Token issued for another API (audience check) ==
+$ python client_guard.py call create_cart --token $OTHER_AUD
+HTTP 401
+WWW-Authenticate: Bearer resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource", error="invalid_token"
+error: token was not issued for this MCP server
+(exit code 0)
+
+== 3. Token without the scope that checkout needs ==
+alice created a cart (cart_id hidden)
+$ python client_guard.py call checkout '{"cart_id": "<alice's cart_id>"}' --token $ALICE
+HTTP 403
+WWW-Authenticate: Bearer error="insufficient_scope", scope="orders:write", resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource"
+error: checkout needs scope orders:write
+
+== 4. Bob sends Alice's cart_id (state handle hijacking) ==
+$ python client_guard.py call add_item '{"cart_id": "<alice's cart_id>", "sku": "SKU-9"}' --token $BOB
+HTTP 200
+isError=True text=cart not found
+
+== 5. Alice gets orders:write and checks out ==
+$ python client_guard.py call checkout '{"cart_id": "<alice's cart_id>"}' --token $ALICE_ORDERS
+HTTP 200
+isError=False text=order placed for 1 item(s)
+
+== 6. A web page on another origin calls the local server (DNS rebinding) ==
+$ python client_guard.py call create_cart --origin http://evil.example --token $ALICE
+HTTP 403
+error: origin not allowed: http://evil.example
+(exit code 0)
+
+== 7. The server changes a tool description after approval (rug pull) ==
+$ python client_guard.py check --token $ALICE
+OK       create_cart
+CHANGED  add_item: sha256:ef60f652b776 -> sha256:fa89476eb434, disable until re-approved
+SUSPECT  add_item: description contains '<IMPORTANT>'
+SUSPECT  add_item: description contains 'Do not mention'
+SUSPECT  add_item: description contains '.ssh'
+SUSPECT  add_item: description contains 'id_rsa'
+OK       checkout
+(exit code 1)
+
