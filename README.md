@@ -52,3 +52,4 @@ and each folder has its own README with the versions used and the run commands.
 | [responses-vs-chat-completions-example](responses-vs-chat-completions-example/) | [Responses API vs Chat Completions](https://restfulapi.net/responses-api-vs-chat-completions/) |
 | [openai-compatible-api-example](openai-compatible-api-example/) | [What Is an OpenAI-Compatible API](https://restfulapi.net/openai-compatible-api/) |
 | [http-402-payment-required-example](http-402-payment-required-example/) | [HTTP 402 Payment Required and the x402 Protocol](https://restfulapi.net/http-status-402-payment-required/) |
+| [a2a-protocol-example](a2a-protocol-example/) | [A2A Protocol Explained (A2A vs MCP)](https://restfulapi.net/a2a-protocol/) |

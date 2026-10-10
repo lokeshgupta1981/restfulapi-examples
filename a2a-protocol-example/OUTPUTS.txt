@@ -1,0 +1,122 @@
+######## client.py (plain HTTP)
+Agent Card: Expense Policy Agent | skills: ['check-expense', 'audit-report'] | interface: {'url': 'http://127.0.0.1:9999/a2a', 'protocolBinding': 'JSONRPC', 'protocolVersion': '1.0'}
+
+== SendMessage without A2A-Version
+{
+  "jsonrpc": "2.0",
+  "id": "6e228fcd",
+  "error": {
+    "code": -32009,
+    "message": "Protocol version not supported",
+    "data": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "domain": "a2a-protocol.org",
+        "reason": "VERSION_NOT_SUPPORTED",
+        "metadata": {
+          "requested": "0.3",
+          "supported": "1.0"
+        }
+      }
+    ]
+  }
+}
+
+== SendMessage, missing receipt
+state: TASK_STATE_INPUT_REQUIRED | agent says: Please send the receipt id (for example R-1234).
+
+== SendMessage, follow-up with taskId
+{
+  "jsonrpc": "2.0",
+  "id": "af89c2ba",
+  "result": {
+    "task": {
+      "id": "task-d9f84748",
+      "contextId": "ctx-246b0c1f",
+      "status": {
+        "state": "TASK_STATE_COMPLETED",
+        "timestamp": "2026-10-10T04:41:11Z"
+      },
+      "artifacts": [
+        {
+          "artifactId": "art-7ce72334",
+          "name": "policy-check",
+          "parts": [
+            {
+              "data": {
+                "category": "hotel",
+                "amountEur": 180,
+                "limitEur": 200,
+                "receipt": "R-5512",
+                "approved": true
+              },
+              "mediaType": "application/json"
+            },
+            {
+              "text": "hotel 180 EUR is within the 200 EUR limit."
+            }
+          ]
+        }
+      ],
+      "history": [
+        {
+          "messageId": "msg-b0ef9f60",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "Check expense: hotel 180 EUR"
+            }
+          ],
+          "taskId": "task-d9f84748",
+          "contextId": "ctx-246b0c1f"
+        },
+        {
+          "messageId": "msg-f18ee2c7",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "Receipt R-5512"
+            }
+          ],
+          "taskId": "task-d9f84748",
+          "contextId": "ctx-246b0c1f"
+        }
+      ]
+    }
+  }
+}
+
+== GetTask: TASK_STATE_COMPLETED | history items: 1
+
+== CancelTask on a completed task
+{
+  "jsonrpc": "2.0",
+  "id": "54145eaa",
+  "error": {
+    "code": -32002,
+    "message": "Task cannot be canceled",
+    "data": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "domain": "a2a-protocol.org",
+        "reason": "TASK_NOT_CANCELABLE",
+        "metadata": {
+          "state": "TASK_STATE_COMPLETED"
+        }
+      }
+    ]
+  }
+}
+
+== SendStreamingMessage (one line per SSE event)
+Content-Type: text/event-stream; charset=utf-8
+task            TASK_STATE_WORKING
+artifactUpdate  12 expenses checked.
+artifactUpdate  1 hotel night over the limit (240 EUR).
+artifactUpdate  Total 1,830 EUR.
+statusUpdate    TASK_STATE_COMPLETED
+
+######## sdk_client.py (a2a-sdk)
+SDK SendMessage -> state: TASK_STATE_COMPLETED
+artifact data: {'category': 'taxi', 'amountEur': 95.0, 'approved': False, 'receipt': 'R-7781', 'limitEur': 80.0}
+artifact text: taxi 95 EUR is over the 80 EUR limit.
