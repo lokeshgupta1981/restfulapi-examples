@@ -1,0 +1,52 @@
+== 1. Prepaid credits
+report call 1: HTTP 200 {'report': 'r-77', 'rows': 42, 'credits_left': 1}
+report call 2: HTTP 200 {'report': 'r-77', 'rows': 42, 'credits_left': 0}
+report call 3: HTTP 402 
+problem: {"type": "https://api.example.com/problems/out-of-credit", "title": "Not enough credit", "status": 402, "detail": "This report costs 1 credit and the balance is 0.", "balance": 0, "cost": 1, "top_up": "https://api.example.com/v1/credits"}
+content-type: application/problem+json
+client action: do not retry, show the top-up link https://api.example.com/v1/credits
+top up: HTTP 200 {'credits': 5}
+report after top-up: HTTP 200 {'report': 'r-77', 'rows': 42, 'credits_left': 4}
+
+exports: HTTP 403 Not included in your plan. client action: upgrade the plan, paying per call does not help
+burst: HTTP 429, Retry-After=10. client action: wait, then retry
+
+== 2. x402 handshake (simulated payment rail)
+first call: HTTP 402, body={}
+PAYMENT-REQUIRED decoded: {
+  "x402Version": 2,
+  "error": "PAYMENT-SIGNATURE header is required",
+  "resource": {
+    "url": "http://127.0.0.1:8000/v1/premium/forecast",
+    "description": "7-day forecast",
+    "mimeType": "application/json"
+  },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "demo:local",
+      "amount": "2500",
+      "asset": "DEMO-USD",
+      "payTo": "demo-seller-wallet",
+      "maxTimeoutSeconds": 60,
+      "extra": {
+        "decimals": 6
+      }
+    }
+  ]
+}
+
+paid call: HTTP 200, body={'city': 'Lisbon', 'days': [21, 22, 22, 20, 19, 21, 23]}
+PAYMENT-RESPONSE decoded: {'success': True, 'transaction': 'demo-tx-7f3a9c2e5b1d', 'network': 'demo:local', 'payer': 'demo-buyer-wallet', 'amount': '2500'}
+
+same PAYMENT-SIGNATURE again: HTTP 402, {'success': False, 'errorReason': 'invalid_transaction_state', 'transaction': '', 'network': 'demo:local', 'payer': 'demo-buyer-wallet'}
+wallet with 1000 units: HTTP 402, {'success': False, 'errorReason': 'insufficient_funds', 'transaction': '', 'network': 'demo:local', 'payer': 'demo-poor-wallet'}
+
+== raw 402 responses
+HTTP/1.1 402 Payment Required
+payment-required: eyJ4NDAyVmVyc2lvbiI6IDIsICJlcnJvciI6ICJQQVlNRU5ULVNJR05BVFVSRSBoZWFkZXIgaXMgcmVxdWlyZWQiLCAicmVzb3VyY2
+content-length: 2
+content-type: application/json
+
+{}
+
