@@ -56,3 +56,4 @@ and each folder has its own README with the versions used and the run commands.
 | [llm-json-repair-example](llm-json-repair-example/) | [How to Fix Invalid JSON from an LLM](https://restfulapi.net/fix-invalid-json-from-llm/) |
 | [mcp-tools-resources-prompts-example](mcp-tools-resources-prompts-example/) | [MCP Tools vs Resources vs Prompts](https://restfulapi.net/mcp-tools-resources-prompts/) |
 | [mcp-tasks-example](mcp-tasks-example/) | [MCP Tasks for Long-Running Tool Calls](https://restfulapi.net/mcp-tasks-extension/) |
+| [mcp-apps-example](mcp-apps-example/) | [MCP Apps, Interactive UI in MCP](https://restfulapi.net/mcp-apps/) |

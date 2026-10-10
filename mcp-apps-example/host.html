@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Minimal MCP Apps test host</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 16px; background: #f9fafb; color: #111827; }
+  .chat { max-width: 760px; }
+  .msg { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .who { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  iframe { width: 100%; height: 260px; border: 1px solid #d1d5db; border-radius: 8px; background: #ffffff; }
+  pre { font-size: 12px; background: #111827; color: #e5e7eb; padding: 10px; border-radius: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="chat">
+  <div class="msg"><div class="who">User</div>Which items in Berlin need restocking?</div>
+  <div class="msg"><div class="who">Assistant (tool call show_inventory)</div><span id="fallback"></span></div>
+  <div id="slot"></div>
+  <pre id="log"></pre>
+</div>
+<script>
+// A minimal host for local testing. A real host also runs a model, asks the user before tool calls,
+// and, as a web page, renders the view through a sandbox proxy on a separate origin.
+const MCP_URL = "/mcp";
+const UI_EXT = "io.modelcontextprotocol/ui";
+const APP_MIME = "text/html;profile=mcp-app";
+const DEFAULT_CSP = "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data:; media-src 'self' data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'";
+const log = [];
+window.hostLog = log;
+let rpcId = 0;
+let tools = [];
+let modelContext = null;
+
+function write(line) {
+  log.push(line);
+  document.getElementById("log").textContent = log.join("\n");
+}
+
+async function mcp(method, params = {}) {
+  // every request carries the 2026-07-28 _meta fields, including the MCP Apps extension
+  params._meta = {
+    "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+    "io.modelcontextprotocol/clientInfo": { name: "test-host", version: "1.0.0" },
+    "io.modelcontextprotocol/clientCapabilities": { extensions: { [UI_EXT]: { mimeTypes: [APP_MIME] } } },
+  };
+  const response = await fetch(MCP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Mcp-Method": method },
+    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+  });
+  return response.json();
+}
+
+function visibility(tool) {
+  return (tool._meta && tool._meta.ui && tool._meta.ui.visibility) || ["model", "app"];
+}
+
+async function main() {
+  const discover = await mcp("server/discover");
+  write("host -> server: server/discover, extensions = " + JSON.stringify(Object.keys(discover.result.capabilities.extensions)));
+  tools = (await mcp("tools/list")).result.tools;
+  const forModel = tools.filter(t => visibility(t).includes("model")).map(t => t.name);
+  write("host: tools shown to the model = " + JSON.stringify(forModel));
+
+  // In a real host the model picks this call. Here the call is fixed.
+  const args = { warehouse: "berlin" };
+  const call = await mcp("tools/call", { name: "show_inventory", arguments: args });
+  document.getElementById("fallback").textContent = call.result.content[0].text;
+  write("host -> server: tools/call show_inventory -> " + call.result.content[0].text);
+
+  const tool = tools.find(t => t.name === "show_inventory");
+  const uri = tool._meta.ui.resourceUri;
+  const read = await mcp("resources/read", { uri });
+  const resource = read.result.contents[0];
+  write("host -> server: resources/read " + uri + " -> mimeType " + resource.mimeType + ", " + resource.text.length + " characters");
+  if (resource.mimeType !== APP_MIME) throw new Error("not an MCP App resource");
+
+  // Restrictive CSP for the view, then a sandboxed iframe without allow-same-origin (opaque origin)
+  const html = resource.text.replace("<head>", `<head><meta http-equiv="Content-Security-Policy" content="${DEFAULT_CSP}">`);
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-scripts");
+  frame.srcdoc = html;
+  document.getElementById("slot").appendChild(frame);
+
+  const send = (msg) => frame.contentWindow.postMessage(msg, "*");
+  window.addEventListener("message", async (event) => {
+    if (event.source !== frame.contentWindow) return;  // only the view may talk to the host
+    const msg = event.data;
+    write("view -> host: " + msg.method + (msg.params && msg.params.name ? " " + msg.params.name : ""));
+    if (msg.method === "ui/initialize") {
+      send({ jsonrpc: "2.0", id: msg.id, result: {
+        protocolVersion: "2026-01-26",
+        hostInfo: { name: "test-host", version: "1.0.0" },
+        hostCapabilities: { serverTools: {}, updateModelContext: { text: {} }, logging: {} },
+        hostContext: { theme: "light", displayMode: "inline", containerDimensions: { maxHeight: 400 },
+                       toolInfo: { id: call.id, tool } },
+      } });
+    } else if (msg.method === "ui/notifications/initialized") {
+      send({ jsonrpc: "2.0", method: "ui/notifications/tool-input", params: { arguments: args } });
+      send({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: call.result });
+      write("host -> view: ui/notifications/tool-input, ui/notifications/tool-result");
+    } else if (msg.method === "tools/call") {
+      const target = tools.find(t => t.name === msg.params.name);
+      if (!target || !visibility(target).includes("app")) {  // the spec requires this check
+        send({ jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: "Tool " + msg.params.name + " is not available to apps" } });
+        write("host: refused " + msg.params.name + " (visibility " + JSON.stringify(target ? visibility(target) : []) + ")");
+        return;
+      }
+      const forwarded = await mcp("tools/call", msg.params);
+      write("host -> server: tools/call " + msg.params.name + " -> " + forwarded.result.content[0].text);
+      send({ jsonrpc: "2.0", id: msg.id, result: forwarded.result });
+    } else if (msg.method === "ui/update-model-context") {
+      modelContext = msg.params;
+      write("host: model context for the next turn = " + msg.params.content[0].text);
+      send({ jsonrpc: "2.0", id: msg.id, result: {} });
+    } else if (msg.id !== undefined) {
+      send({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+    }
+  });
+}
+main().catch(err => write("host error: " + err.message));
+</script>
+</body>
+</html>
