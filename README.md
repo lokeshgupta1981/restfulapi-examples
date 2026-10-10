@@ -45,3 +45,4 @@ and each folder has its own README with the versions used and the run commands.
 | [idempotent-rest-apis-example](idempotent-rest-apis-example/) | [Idempotent REST API](https://restfulapi.net/idempotent-rest-apis/) |
 | [rest-put-vs-post-example](rest-put-vs-post-example/) | [HTTP PUT vs. POST](https://restfulapi.net/rest-put-vs-post/) |
 | [llm-structured-outputs-json-schema-example](llm-structured-outputs-json-schema-example/) | [LLM Structured Outputs with JSON Schema](https://restfulapi.net/llm-structured-outputs-json-schema/) |
+| [mcp-security-example](mcp-security-example/) | [MCP Security Risks and Best Practices](https://restfulapi.net/mcp-security/) |
