@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inventory</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 12px; color: #111827; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
+  tr.low td { background: #fef2f2; }
+  button { font-size: 13px; padding: 3px 8px; cursor: pointer; }
+  #status { font-size: 13px; color: #374151; margin-top: 8px; min-height: 18px; }
+</style>
+</head>
+<body>
+<h1 id="title">Waiting for data...</h1>
+<table><thead><tr><th>SKU</th><th>Item</th><th>Stock</th><th>Reorder at</th><th></th></tr></thead>
+<tbody id="rows"></tbody></table>
+<p><button id="export">Export CSV (model-only tool)</button></p>
+<div id="status"></div>
+<script>
+// The view speaks JSON-RPC 2.0 with the host over postMessage. No SDK, so every message is visible.
+let nextId = 1;
+const pending = new Map();
+let warehouse = null;
+const items = new Map();
+
+function request(method, params) {
+  const id = nextId++;
+  window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+}
+function notify(method, params) {
+  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+}
+function status(text) { document.getElementById("status").textContent = text; }
+
+function render() {
+  document.getElementById("title").textContent = "Inventory " + warehouse.charAt(0).toUpperCase() + warehouse.slice(1);
+  const rows = document.getElementById("rows");
+  rows.innerHTML = "";
+  for (const item of items.values()) {
+    const tr = document.createElement("tr");
+    if (item.stock < item.reorderAt) tr.className = "low";
+    for (const value of [item.sku, item.name, item.stock, item.reorderAt]) {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    }
+    const td = document.createElement("td");
+    const button = document.createElement("button");
+    button.textContent = "Restock +50";
+    button.dataset.sku = item.sku;
+    button.onclick = () => restock(item.sku);
+    td.appendChild(button);
+    tr.appendChild(td);
+    rows.appendChild(tr);
+  }
+}
+
+async function restock(sku) {
+  // restock_item has visibility ["app"]: the model cannot call it, the view can
+  const res = await request("tools/call", { name: "restock_item", arguments: { warehouse, sku, quantity: 50 } });
+  items.set(sku, res.structuredContent);
+  render();
+  status(res.content[0].text);
+  // tell the model what the user did, for its next turn
+  const low = [...items.values()].filter(i => i.stock < i.reorderAt).map(i => i.sku);
+  await request("ui/update-model-context", { content: [{ type: "text",
+    text: `User restocked ${sku} in ${warehouse}. Items below reorder level: ${low.join(", ") || "none"}.` }] });
+}
+
+document.getElementById("export").onclick = async () => {
+  try {
+    await request("tools/call", { name: "export_report", arguments: { warehouse } });
+    status("Export worked.");
+  } catch (err) {
+    status("Export refused by host: " + err.message);
+  }
+};
+
+window.addEventListener("message", (event) => {
+  if (event.source !== window.parent) return;  // only the host may talk to the view
+  const msg = event.data;
+  if (msg && msg.id !== undefined && pending.has(msg.id)) {  // a response to one of our requests
+    const { resolve, reject } = pending.get(msg.id);
+    pending.delete(msg.id);
+    msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-input") {
+    warehouse = msg.params.arguments.warehouse;
+  } else if (msg.method === "ui/notifications/tool-result") {
+    warehouse = msg.params.structuredContent.warehouse;
+    for (const item of msg.params.structuredContent.items) items.set(item.sku, item);
+    render();
+    status(msg.params.content[0].text);
+  }
+});
+
+(async () => {
+  const init = await request("ui/initialize", {
+    appInfo: { name: "inventory-view", version: "1.0.0" },
+    appCapabilities: { availableDisplayModes: ["inline"] },
+    protocolVersion: "2026-01-26",
+  });
+  notify("ui/notifications/initialized", {});
+  status("Connected to " + init.hostInfo.name);
+})();
+</script>
+</body>
+</html>

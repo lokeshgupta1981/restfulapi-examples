@@ -1,0 +1,14 @@
+host -> server: server/discover, extensions = ["io.modelcontextprotocol/ui"]
+host: tools shown to the model = ["show_inventory","export_report"]
+host -> server: tools/call show_inventory -> Berlin has 3 items. Below reorder level: MS-02, HD-07.
+host -> server: resources/read ui://inventory/dashboard -> mimeType text/html;profile=mcp-app, 4342 characters
+view -> host: ui/initialize
+view -> host: ui/notifications/initialized
+host -> view: ui/notifications/tool-input, ui/notifications/tool-result
+view -> host: tools/call restock_item
+host -> server: tools/call restock_item -> MS-02 stock is 58.
+view -> host: ui/update-model-context
+host: model context for the next turn = User restocked MS-02 in berlin. Items below reorder level: HD-07.
+view -> host: tools/call export_report
+host: refused export_report (visibility ["model"])
+view status line: Export refused by host: Tool export_report is not available to apps
