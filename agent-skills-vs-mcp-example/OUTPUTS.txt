@@ -1,0 +1,59 @@
+Run: python demo.py on a clean venv. Python 3.13.16, PyYAML 6.0.3, date 2026-10-10. Token counts are estimates (characters / 4).
+
+== 1. Discover skills (tier 1 metadata only)
+skipped Bad_Name: name must be 1-64 lowercase letters, digits and single hyphens; description is under 40 characters, our own rule so the model can match it
+loaded: refund-policy, release-notes
+
+== 2. What the model sees at session start
+<available_skills>
+  <skill>
+    <name>refund-policy</name>
+    <description>Decide whether and how much to refund for a customer invoice, following the company refund rules. Use when a customer asks for a refund, a credit or money back on an invoice.</description>
+  </skill>
+  <skill>
+    <name>release-notes</name>
+    <description>Write release notes from merged pull requests in the team's format. Use when the user asks for release notes, a changelog entry or a summary of what shipped.</description>
+  </skill>
+</available_skills>
+skill catalog: 537 chars, about 134 tokens
+MCP tool definitions: 2 tools, 503 chars, about 125 tokens
+
+== 3. User: 'Ana Costa wants a refund for invoice INV-2041.' The model activates refund-policy (tier 2)
+<skill_content name="refund-policy">
+# Refund policy
+
+Follow these steps for every refund request.
+
+1. Get the invoice with the `get_invoice` tool of the billing MCP server.
+2. Read [the refund rules](references/REFUND-RULES.md) and find the rule that matches the plan and the age of the invoice.
+3. Calculate the amount with `scripts/calculate_refund.py <plan> <days_since_invoice> <amount_cents>`.
+   Never calculate the amount yourself.
+4. If the amount is above 50000 cents, stop and ask a human approver.
+5. Otherwise call `issue_refund` with the invoice ID and the calculated amount, and tell the customer the amount and the rule you applied.
+
+Skill directory: refund-policy
+<skill_resources>
+  <file>references/REFUND-RULES.md</file>
+  <file>scripts/calculate_refund.py</file>
+</skill_resources>
+</skill_content>
+activated skill: about 204 tokens, loaded only now
+
+== 4. Step 1 of the skill: the MCP tool fetches live data
+get_invoice -> {'customer': 'Ana Costa', 'plan': 'annual', 'amount_cents': 120000, 'days_since_invoice': 45}
+
+== 5. Steps 2 and 3: read the rules file (tier 3) and run the bundled script
+read references/REFUND-RULES.md: about 68 tokens
+$ python scripts/calculate_refund.py annual 45 120000
+refund_cents=100000 rule=annual, 31 to 90 days: pro rata, 10 of 12 months
+
+== 6. Step 4: the rule in the skill decides what happens next
+refund 100000 cents is above 50000, so the agent asks a human approver and does not call issue_refund yet
+
+== 7. The same skill served by the MCP server (Skills extension, SEP-2640)
+server/discover -> extensions: ['io.modelcontextprotocol/skills']
+skills/list -> skill://refund-policy/SKILL.md, name refund-policy, 3 files
+   skill://refund-policy/SKILL.md  sha256:63f32c85a6f4...  878 bytes
+   skill://refund-policy/references/REFUND-RULES.md  sha256:4238a74ced04...  272 bytes
+   skill://refund-policy/scripts/calculate_refund.py  sha256:b2496d5daf70...  849 bytes
+resources/read skill://refund-policy/SKILL.md -> digest matches the listing: True
