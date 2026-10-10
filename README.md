@@ -51,3 +51,4 @@ and each folder has its own README with the versions used and the run commands.
 | [agent-skills-vs-mcp-example](agent-skills-vs-mcp-example/) | [Agent Skills vs MCP](https://restfulapi.net/agent-skills-vs-mcp/) |
 | [responses-vs-chat-completions-example](responses-vs-chat-completions-example/) | [Responses API vs Chat Completions](https://restfulapi.net/responses-api-vs-chat-completions/) |
 | [openai-compatible-api-example](openai-compatible-api-example/) | [What Is an OpenAI-Compatible API](https://restfulapi.net/openai-compatible-api/) |
+| [http-402-payment-required-example](http-402-payment-required-example/) | [HTTP 402 Payment Required and the x402 Protocol](https://restfulapi.net/http-status-402-payment-required/) |
