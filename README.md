@@ -61,3 +61,4 @@ and each folder has its own README with the versions used and the run commands.
 | [mcp-vs-cli-example](mcp-vs-cli-example/) | [MCP vs CLI for AI Agents](https://restfulapi.net/mcp-vs-cli/) |
 | [acp-example](acp-example/) | [Agent Client Protocol (ACP) Explained](https://restfulapi.net/agent-client-protocol/) |
 | [llms-txt-example](llms-txt-example/) | [llms.txt for API Documentation](https://restfulapi.net/llms-txt/) |
+| [vibe-coding-security-example](vibe-coding-security-example/) | [API Security Checklist for AI-Generated Code](https://restfulapi.net/vibe-coding-api-security-checklist/) |
