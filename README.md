@@ -54,3 +54,4 @@ and each folder has its own README with the versions used and the run commands.
 | [http-402-payment-required-example](http-402-payment-required-example/) | [HTTP 402 Payment Required and the x402 Protocol](https://restfulapi.net/http-status-402-payment-required/) |
 | [a2a-protocol-example](a2a-protocol-example/) | [A2A Protocol Explained (A2A vs MCP)](https://restfulapi.net/a2a-protocol/) |
 | [llm-json-repair-example](llm-json-repair-example/) | [How to Fix Invalid JSON from an LLM](https://restfulapi.net/fix-invalid-json-from-llm/) |
+| [mcp-tools-resources-prompts-example](mcp-tools-resources-prompts-example/) | [MCP Tools vs Resources vs Prompts](https://restfulapi.net/mcp-tools-resources-prompts/) |
