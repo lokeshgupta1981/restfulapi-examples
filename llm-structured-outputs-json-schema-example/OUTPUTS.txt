@@ -1,0 +1,143 @@
+Run: ./run_demo.sh against 'uvicorn stub_server:app --port 8000' on a clean venv. Python 3.13.16, fastapi 0.143.0, jsonschema 4.26.0, pydantic 2.14.0, uvicorn 0.54.0, date 2026-10-10.
+
+== 1. A finished answer from each vendor format ==
+$ python client.py openai --show-response
+response: {"id": "resp_stub_001", "object": "response", "status": "completed", "incomplete_details": null, "model": "gpt-6-astra", "output": [{"id": "msg_stub_001", "type": "message", "status": "completed", "role": "assistant", "content": [{"type": "output_text", "text": "{\"events\":[{\"title\":\"Sprint review\",\"kind\":\"meeting\",\"date\":\"2026-10-14\",\"start_time\":\"15:00\",\"attendees\":[\"Ana\",\"Raj\"]},{\"title\":\"Budget call\",\"kind\":\"call\",\"date\":\"2026-10-16\",\"start_time\":null,\"attendees\":[\"Mei\"]},{\"title\":\"Q3 report\",\"kind\":\"deadline\",\"date\":\"2026-10-20\",\"start_time\":null,\"attendees\":[]}]}", "annotations": []}]}], "usage": {"input_tokens": 73, "output_tokens": 78}}
+{
+  "events": [
+    {
+      "title": "Sprint review",
+      "kind": "meeting",
+      "date": "2026-10-14",
+      "start_time": "15:00",
+      "attendees": [
+        "Ana",
+        "Raj"
+      ]
+    },
+    {
+      "title": "Budget call",
+      "kind": "call",
+      "date": "2026-10-16",
+      "start_time": null,
+      "attendees": [
+        "Mei"
+      ]
+    },
+    {
+      "title": "Q3 report",
+      "kind": "deadline",
+      "date": "2026-10-20",
+      "start_time": null,
+      "attendees": []
+    }
+  ]
+}
+(exit code 0)
+
+$ python client.py anthropic --show-response
+response: {"id": "msg_stub_001", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "content": [{"type": "text", "text": "{\"events\":[{\"title\":\"Sprint review\",\"kind\":\"meeting\",\"date\":\"2026-10-14\",\"start_time\":\"15:00\",\"attendees\":[\"Ana\",\"Raj\"]},{\"title\":\"Budget call\",\"kind\":\"call\",\"date\":\"2026-10-16\",\"start_time\":null,\"attendees\":[\"Mei\"]},{\"title\":\"Q3 report\",\"kind\":\"deadline\",\"date\":\"2026-10-20\",\"start_time\":null,\"attendees\":[]}]}"}], "stop_reason": "end_turn", "stop_details": null, "stop_sequence": null, "usage": {"input_tokens": 45, "output_tokens": 78}}
+{
+  "events": [
+    {
+      "title": "Sprint review",
+      "kind": "meeting",
+      "date": "2026-10-14",
+      "start_time": "15:00",
+      "attendees": [
+        "Ana",
+        "Raj"
+      ]
+    },
+    {
+      "title": "Budget call",
+      "kind": "call",
+      "date": "2026-10-16",
+      "start_time": null,
+      "attendees": [
+        "Mei"
+      ]
+    },
+    {
+      "title": "Q3 report",
+      "kind": "deadline",
+      "date": "2026-10-20",
+      "start_time": null,
+      "attendees": []
+    }
+  ]
+}
+(exit code 0)
+
+$ python client.py gemini --show-response
+response: {"id": "int_stub_001", "object": "interaction", "model": "gemini-3.8-flash", "status": "completed", "steps": [{"type": "model_output", "content": [{"type": "text", "text": "{\"events\":[{\"title\":\"Sprint review\",\"kind\":\"meeting\",\"date\":\"2026-10-14\",\"start_time\":\"15:00\",\"attendees\":[\"Ana\",\"Raj\"]},{\"title\":\"Budget call\",\"kind\":\"call\",\"date\":\"2026-10-16\",\"start_time\":null,\"attendees\":[\"Mei\"]},{\"title\":\"Q3 report\",\"kind\":\"deadline\",\"date\":\"2026-10-20\",\"start_time\":null,\"attendees\":[]}]}"}]}], "usage": {"total_input_tokens": 45, "total_output_tokens": 78, "total_tokens": 123}}
+{
+  "events": [
+    {
+      "title": "Sprint review",
+      "kind": "meeting",
+      "date": "2026-10-14",
+      "start_time": "15:00",
+      "attendees": [
+        "Ana",
+        "Raj"
+      ]
+    },
+    {
+      "title": "Budget call",
+      "kind": "call",
+      "date": "2026-10-16",
+      "start_time": null,
+      "attendees": [
+        "Mei"
+      ]
+    },
+    {
+      "title": "Q3 report",
+      "kind": "deadline",
+      "date": "2026-10-20",
+      "start_time": null,
+      "attendees": []
+    }
+  ]
+}
+(exit code 0)
+
+== 2. Truncated answer: the token limit cuts the JSON off ==
+$ python client.py openai --max-tokens 30
+TRUNCATED: 120 characters received, json.loads says: Expecting ',' delimiter: line 1 column 121 (char 120). Retry with a higher token limit.
+(exit code 3)
+
+$ python client.py anthropic --max-tokens 30
+TRUNCATED: 120 characters received, json.loads says: Expecting ',' delimiter: line 1 column 121 (char 120). Retry with a higher token limit.
+(exit code 3)
+
+$ python client.py gemini --max-tokens 30
+TRUNCATED: 120 characters received, json.loads says: Expecting ',' delimiter: line 1 column 121 (char 120). Retry with a higher token limit.
+(exit code 3)
+
+== 3. Refusal ==
+$ python client.py openai --scenario refusal --show-response
+response: {"id": "resp_stub_001", "object": "response", "status": "completed", "incomplete_details": null, "model": "gpt-6-astra", "output": [{"id": "msg_stub_001", "type": "message", "status": "completed", "role": "assistant", "content": [{"type": "refusal", "refusal": "I'm sorry, I cannot assist with that request."}]}], "usage": {"input_tokens": 73, "output_tokens": 11}}
+REFUSED: I'm sorry, I cannot assist with that request.
+(exit code 2)
+
+$ python client.py anthropic --scenario refusal --show-response
+response: {"id": "msg_stub_001", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "content": [{"type": "text", "text": "I can't help with that request."}], "stop_reason": "refusal", "stop_details": {"type": "refusal", "category": null, "explanation": null}, "stop_sequence": null, "usage": {"input_tokens": 45, "output_tokens": 9}}
+REFUSED: I can't help with that request.
+(exit code 2)
+
+== 4. JSON that ignores the schema (a server without strict mode) ==
+$ python client.py openai --scenario drift
+INVALID:
+  $.events[0].attendees: 'Ana, Raj' is not of type 'array'
+  $.events[0].date: '14/10/2026' is not a 'date'
+  $.events[0].kind: 'Meeting' is not one of ['meeting', 'call', 'deadline']
+(exit code 4)
+
+== 5. Schema-valid JSON with a date that is not in the email ==
+$ python client.py anthropic --scenario wrong-date
+INVALID:
+  date not found in the email: 2026-10-15
+(exit code 4)
+
