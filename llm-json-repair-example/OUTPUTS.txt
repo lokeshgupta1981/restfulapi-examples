@@ -1,0 +1,36 @@
+######## demo.py (Python, json-repair + Pydantic)
+case                 json.loads  outcome   detail
+valid JSON           ok          valid     total=59.9 items=1
+markdown fence       error       valid     total=59.9 items=1
+prose around JSON    error       valid     total=59.9 items=1
+trailing comma       error       repaired  total=59.9 items=1
+single quotes        error       repaired  total=59.9 items=1
+Python literals      error       repaired  total=59.9 items=1
+comments             error       repaired  total=59.9 items=1
+unquoted keys        error       repaired  total=59.9 items=1
+unescaped quote      error       repaired  total=59.9 items=1
+truncated output     error       retry     The reply was cut off at the token limit. Raise max_tokens or ask for less data.
+NaN value            ok          retry     The JSON does not match the schema: total: Input should be a finite number
+
+== The truncated reply without the stop reason check
+json_repair.loads on the raw reply: {"order_id": "A-1001", "items": [{"sku": "KB-01", "qty": 2}, {"sku": "MS-"}]}
+pipeline result: The JSON does not match the schema: items.1.sku: String should match pattern '^[A-Z]{2}-\d{2}$'; items.1.qty: Field required; total: Field required; currency: Field required
+
+== Retry with the reason
+prompt: Your last reply could not be used. The JSON does not match the schema: total: Input should be a finite number Reply with only one JSON object that matches the schema, without code fences or comments.
+second reply: valid {'order_id': 'A-1001', 'items': [{'sku': 'KB-01', 'qty': 2}], 'total': 59.9, 'currency': 'EUR'}
+
+######## js/repair.mjs (Node.js, jsonrepair)
+valid JSON           | ok                                            | valid
+markdown fence       | Unexpected token '`', "```json                | valid
+prose around JSON    | Unexpected token 'S', "Sure! Here"... is not  | invalid: (root) invalid_type
+                     | repaired: ["Sure! Here is the order:",{"order_id":"A-1001","items":[{"sku":"KB-01","qty":2}],"total":59.9,"currency":"EUR"},"Let me know if you need anything else."]
+trailing comma       | Unexpected token ']', ...""qty": 2},], "total | valid
+single quotes        | Expected property name or '}' in JSON at posi | valid
+Python literals      | Unexpected token 'T', ...", "gift": True, "co | valid
+comments             | Expected double-quoted property name in JSON  | valid
+unquoted keys        | Expected property name or '}' in JSON at posi | valid
+unescaped quote      | Expected ',' or '}' after property value in J | valid
+truncated output     | Unterminated string in JSON at position 73 (l | invalid: items.1.sku invalid_format, items.1.qty invalid_type, total invalid_type, currency invalid_value
+NaN value            | Unexpected token 'N', ..." "total": NaN, "cur | invalid: total invalid_type
+                     | repaired: {"order_id":"A-1001","items":[{"sku":"KB-01","qty":2}],"total":"NaN","currency":"EUR"}

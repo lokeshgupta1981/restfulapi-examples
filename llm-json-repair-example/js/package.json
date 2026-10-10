@@ -1,0 +1,14 @@
+{
+  "name": "llm-json-repair-js",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "jsonrepair and Zod on the same broken LLM replies",
+  "scripts": {
+    "start": "node repair.mjs"
+  },
+  "dependencies": {
+    "jsonrepair": "3.15.0",
+    "zod": "4.6.5"
+  }
+}
