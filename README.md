@@ -47,3 +47,4 @@ and each folder has its own README with the versions used and the run commands.
 | [llm-structured-outputs-json-schema-example](llm-structured-outputs-json-schema-example/) | [LLM Structured Outputs with JSON Schema](https://restfulapi.net/llm-structured-outputs-json-schema/) |
 | [mcp-security-example](mcp-security-example/) | [MCP Security Risks and Best Practices](https://restfulapi.net/mcp-security/) |
 | [ai-gateway-vs-mcp-gateway-example](ai-gateway-vs-mcp-gateway-example/) | [AI Gateway vs MCP Gateway](https://restfulapi.net/ai-gateway-vs-mcp-gateway/) |
+| [mcp-transports-example](mcp-transports-example/) | [MCP Transports, stdio vs Streamable HTTP](https://restfulapi.net/mcp-transports-stdio-vs-streamable-http/) |
