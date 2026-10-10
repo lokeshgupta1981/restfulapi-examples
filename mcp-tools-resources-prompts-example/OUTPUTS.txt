@@ -1,0 +1,219 @@
+======== 1. Discover the server
+--> server/discover
+<-- {
+      "supportedVersions": [
+        "2026-07-28"
+      ],
+      "capabilities": {
+        "tools": {},
+        "resources": {},
+        "prompts": {}
+      },
+      "instructions": "Travel bookings. Read the cancellation policy before cancelling.",
+      "ttlMs": 3600000,
+      "cacheScope": "public",
+      "resultType": "complete"
+    }
+
+======== 2. Tools: the model picks and calls them
+tool get_booking: outputSchema=True, annotations={'readOnlyHint': True}
+tool cancel_booking: outputSchema=False, annotations={'destructiveHint': True}
+
+--> tools/call {"name": "get_booking", "arguments": {"booking_id": "B-2041"}}
+<-- {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"booking_id\": \"B-2041\", \"traveler\": \"Ana Silva\", \"hotel\": \"Harbor View Lisbon\", \"check_in\": \"2026-11-12\", \"nights\": 3, \"total_eur\": 486.0, \"status\": \"confirmed\"}"
+        },
+        {
+          "type": "resource_link",
+          "uri": "bookings://B-2041/receipt",
+          "name": "booking-receipt",
+          "mimeType": "text/plain"
+        }
+      ],
+      "structuredContent": {
+        "booking_id": "B-2041",
+        "traveler": "Ana Silva",
+        "hotel": "Harbor View Lisbon",
+        "check_in": "2026-11-12",
+        "nights": 3,
+        "total_eur": 486.0,
+        "status": "confirmed"
+      },
+      "isError": false,
+      "resultType": "complete"
+    }
+
+--> resources/read {"uri": "bookings://B-2041/receipt"}
+<-- {
+      "contents": [
+        {
+          "uri": "bookings://B-2041/receipt",
+          "mimeType": "text/plain",
+          "text": "Receipt B-2041: Harbor View Lisbon, 3 nights from 2026-11-12, 486.00 EUR, confirmed"
+        }
+      ],
+      "ttlMs": 60000,
+      "cacheScope": "private",
+      "resultType": "complete"
+    }
+
+--> tools/call {"name": "get_booking", "arguments": {"booking_id": "B-9999"}}
+<-- {
+      "content": [
+        {
+          "type": "text",
+          "text": "No booking with id 'B-9999'. Booking ids look like B-2041."
+        }
+      ],
+      "isError": true,
+      "resultType": "complete"
+    }
+
+--> tools/call {"name": "book_flight", "arguments": {}}
+<-- {
+      "error": {
+        "code": -32602,
+        "message": "Unknown tool: book_flight"
+      }
+    }
+
+======== 3. Resources: the host app picks what to read
+resource docs://policies/cancellation (text/markdown)
+template bookings://{booking_id}/receipt (text/plain)
+
+--> resources/read {"uri": "docs://policies/cancellation"}
+<-- {
+      "contents": [
+        {
+          "uri": "docs://policies/cancellation",
+          "mimeType": "text/markdown",
+          "text": "# Cancellation policy\n- Free cancellation up to 7 days before check-in.\n- Later cancellations pay one night.\n"
+        }
+      ],
+      "ttlMs": 3600000,
+      "cacheScope": "public",
+      "resultType": "complete"
+    }
+
+--> resources/read {"uri": "bookings://B-7777/receipt"}
+<-- {
+      "error": {
+        "code": -32602,
+        "message": "Resource not found",
+        "data": {
+          "uri": "bookings://B-7777/receipt"
+        }
+      }
+    }
+
+======== 4. Prompts: the user picks them, for example as /draft_cancellation_reply
+prompt draft_cancellation_reply args=['booking_id', 'tone']
+
+--> prompts/get {"name": "draft_cancellation_reply", "arguments": {"booking_id": "B-2042", "tone": "formal"}}
+<-- {
+      "description": "Cancellation reply",
+      "messages": [
+        {
+          "role": "user",
+          "content": {
+            "type": "text",
+            "text": "Write a formal email to Ravi Menon about cancelling booking B-2042 (Old Town Prague, check-in 2026-12-01). Apply the policy below and state the fee."
+          }
+        },
+        {
+          "role": "user",
+          "content": {
+            "type": "resource",
+            "resource": {
+              "uri": "docs://policies/cancellation",
+              "mimeType": "text/markdown",
+              "text": "# Cancellation policy\n- Free cancellation up to 7 days before check-in.\n- Later cancellations pay one night.\n"
+            }
+          }
+        }
+      ],
+      "resultType": "complete"
+    }
+
+--> prompts/get {"name": "draft_cancellation_reply", "arguments": {}}
+<-- {
+      "error": {
+        "code": -32602,
+        "message": "Missing or unknown required argument: booking_id"
+      }
+    }
+
+======== 5. Elicitation inside a tool call (multi round-trip request)
+--> tools/call {"name": "cancel_booking", "arguments": {"booking_id": "B-2042"}}
+<-- {
+      "error": {
+        "code": -32021,
+        "message": "Server requires the elicitation capability for this request",
+        "data": {
+          "requiredCapabilities": {
+            "elicitation": {}
+          }
+        }
+      }
+    }
+
+--> tools/call {"name": "cancel_booking", "arguments": {"booking_id": "B-2042"}}
+<-- {
+      "resultType": "input_required",
+      "inputRequests": {
+        "confirm_cancel": {
+          "method": "elicitation/create",
+          "params": {
+            "mode": "form",
+            "message": "Cancel Old Town Prague from 2026-12-01 for Ravi Menon?",
+            "requestedSchema": {
+              "type": "object",
+              "properties": {
+                "confirm": {
+                  "type": "boolean",
+                  "title": "Yes, cancel this booking"
+                },
+                "reason": {
+                  "type": "string",
+                  "title": "Reason",
+                  "enum": [
+                    "change of plans",
+                    "found a better price",
+                    "other"
+                  ]
+                }
+              },
+              "required": [
+                "confirm"
+              ]
+            }
+          }
+        }
+      },
+      "requestState": "eyJjYWxsIjoidG9vbHMvY2FsbDpjYW5jZWxfYm9va2luZzpCLTIwNDIiLCJleHAiOjE3OTE2MDk1NTd9.d60185c11a1a0163d3c62d77df898b31"
+    }
+
+--> tools/call {"name": "cancel_booking", "arguments": {"booking_id": "B-2042"}, "inputResponses": {"confirm_cancel": {"action": "accept", "content": {"confirm": true, "reason": "change of plans"}}}, "requestState": "eyJjYWxsIjoidG9vbHMvY2FsbDpjYW5jZWxfYm9va2luZzpCLTIwNDIiLCJleHAiOjE3OTE2MDk1NTd9.d60185c11a1a0163d3c62d77df890000"}
+<-- {
+      "error": {
+        "code": -32602,
+        "message": "Invalid or expired requestState"
+      }
+    }
+
+--> tools/call {"name": "cancel_booking", "arguments": {"booking_id": "B-2042"}, "inputResponses": {"confirm_cancel": {"action": "accept", "content": {"confirm": true, "reason": "change of plans"}}}, "requestState": "eyJjYWxsIjoidG9vbHMvY2FsbDpjYW5jZWxfYm9va2luZzpCLTIwNDIiLCJleHAiOjE3OTE2MDk1NTd9.d60185c11a1a0163d3c62d77df898b31"}
+<-- {
+      "content": [
+        {
+          "type": "text",
+          "text": "Booking B-2042 is cancelled. Reason: change of plans."
+        }
+      ],
+      "isError": false,
+      "resultType": "complete"
+    }
+
+status of B-2042 after the retry: cancelled
