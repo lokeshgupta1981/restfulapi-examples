@@ -60,3 +60,4 @@ and each folder has its own README with the versions used and the run commands.
 | [mcp-server-connection-errors-example](mcp-server-connection-errors-example/) | [MCP Server Connection Errors and How to Fix Them](https://restfulapi.net/mcp-server-connection-errors/) |
 | [mcp-vs-cli-example](mcp-vs-cli-example/) | [MCP vs CLI for AI Agents](https://restfulapi.net/mcp-vs-cli/) |
 | [acp-example](acp-example/) | [Agent Client Protocol (ACP) Explained](https://restfulapi.net/agent-client-protocol/) |
+| [llms-txt-example](llms-txt-example/) | [llms.txt for API Documentation](https://restfulapi.net/llms-txt/) |

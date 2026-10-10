@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Acme Orders API
+  version: 2026-09-01
+  description: REST API for creating and tracking orders in the Acme shop.
+servers:
+  - url: https://api.acme.example/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Orders
+    description: Create, read and cancel orders.
+  - name: Customers
+    description: Read customer profiles and their order history.
+paths:
+  /orders:
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: List orders
+      description: Returns orders, newest first. Use cursor pagination with the next_cursor field.
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [open, paid, shipped, cancelled]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: cursor, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: A page of orders.
+          content:
+            application/json:
+              example: {"data": [{"id": "ord_1001", "status": "paid", "total": 4990, "currency": "EUR"}], "next_cursor": "c_2"}
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Create an order
+      description: Creates an order. Send an Idempotency-Key header so that a retry does not create a second order.
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: {"customer_id": "cus_42", "items": [{"sku": "KB-01", "quantity": 1}]}
+      responses:
+        "201":
+          description: The created order.
+          content:
+            application/json:
+              example: {"id": "ord_1002", "status": "open", "total": 8900, "currency": "EUR"}
+        "422":
+          description: Validation failed, see the errors guide.
+  /orders/{order_id}:
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Get an order
+      description: Returns one order with its items.
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The order.
+        "404":
+          description: No order with this ID.
+  /orders/{order_id}/cancel:
+    post:
+      tags: [Orders]
+      operationId: cancelOrder
+      summary: Cancel an order
+      description: Cancels an open or paid order. Shipped orders return HTTP 409.
+      parameters:
+        - {name: order_id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The cancelled order.
+        "409":
+          description: The order was already shipped.
+  /customers/{customer_id}:
+    get:
+      tags: [Customers]
+      operationId: getCustomer
+      summary: Get a customer
+      description: Returns one customer profile.
+      parameters:
+        - {name: customer_id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The customer.
+  /customers/{customer_id}/orders:
+    get:
+      tags: [Customers]
+      operationId: listCustomerOrders
+      summary: List a customer's orders
+      description: Returns the orders of one customer, newest first.
+      parameters:
+        - {name: customer_id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: A page of orders.
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
