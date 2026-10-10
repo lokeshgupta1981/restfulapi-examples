@@ -49,3 +49,4 @@ and each folder has its own README with the versions used and the run commands.
 | [ai-gateway-vs-mcp-gateway-example](ai-gateway-vs-mcp-gateway-example/) | [AI Gateway vs MCP Gateway](https://restfulapi.net/ai-gateway-vs-mcp-gateway/) |
 | [mcp-transports-example](mcp-transports-example/) | [MCP Transports, stdio vs Streamable HTTP](https://restfulapi.net/mcp-transports-stdio-vs-streamable-http/) |
 | [agent-skills-vs-mcp-example](agent-skills-vs-mcp-example/) | [Agent Skills vs MCP](https://restfulapi.net/agent-skills-vs-mcp/) |
+| [responses-vs-chat-completions-example](responses-vs-chat-completions-example/) | [Responses API vs Chat Completions](https://restfulapi.net/responses-api-vs-chat-completions/) |

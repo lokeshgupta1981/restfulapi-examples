@@ -1,0 +1,145 @@
+######## chat_demo.py
+== 1. The model asks for a tool call
+finish_reason: tool_calls
+tool call: call_002 get_order_status {"order_id": "A-1001"}
+
+== 2. We run the tool and send the result back
+answer: Order A-1001 is shipped. It should arrive on 2026-10-14.
+messages sent so far: 5
+
+== 3. A follow-up question, with and without the history
+with history:    The delivery date for order A-1001 is 2026-10-14.
+without history: I do not know which order you mean. Please send the order id.
+usage with history: 63 prompt tokens
+
+== 4. Streaming
+'The ' 'delivery ' 'date ' 'for ' 'order ' 'A-1001 ' 'is ' '2026-10-14.' 
+finish_reason: stop
+
+######## responses_demo.py
+== 1. The model asks for a tool call
+output item types: ['function_call']
+function_call: call_009 get_order_status {"order_id": "A-1001"}
+
+== 2. We run the tool and send only the result
+answer: Order A-1001 is shipped. It should arrive on 2026-10-14.
+response id: resp_010
+
+== 3. A follow-up question, with and without previous_response_id
+with previous_response_id:    The delivery date for order A-1001 is 2026-10-14.
+without previous_response_id: I do not know which order you mean. Please send the order id.
+usage with previous_response_id: 70 input tokens
+
+== 4. Streaming
+[response.created] [response.output_item.added] [response.content_part.added] 'The ' 'delivery ' 'date ' 'for ' 'order ' 'A-1001 ' 'is ' '2026-10-14.' [response.output_text.done] [response.content_part.done] [response.output_item.done] 
+response.completed, status: completed
+
+######## wire.sh
+== POST /v1/chat/completions
+{
+    "id": "chatcmpl-018",
+    "object": "chat.completion",
+    "created": 1791604165,
+    "model": "stub-model-1",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "Hello! Send me an order id, for example A-1001, and I will check its status.",
+                "refusal": null,
+                "annotations": []
+            },
+            "logprobs": null,
+            "finish_reason": "stop"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 12,
+        "completion_tokens": 15,
+        "total_tokens": 27
+    }
+}
+
+== POST /v1/responses
+{
+    "id": "resp_019",
+    "object": "response",
+    "created_at": 1791604165,
+    "status": "completed",
+    "error": null,
+    "incomplete_details": null,
+    "instructions": "You answer questions about orders.",
+    "max_output_tokens": null,
+    "model": "stub-model-1",
+    "output": [
+        {
+            "type": "message",
+            "id": "msg_020",
+            "status": "completed",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "output_text",
+                    "text": "Hello! Send me an order id, for example A-1001, and I will check its status.",
+                    "annotations": [],
+                    "logprobs": []
+                }
+            ]
+        }
+    ],
+    "parallel_tool_calls": true,
+    "previous_response_id": null,
+    "store": false,
+    "temperature": 1.0,
+    "text": {
+        "format": {
+            "type": "text"
+        }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_p": 1.0,
+    "truncation": "disabled",
+    "usage": {
+        "input_tokens": 6,
+        "input_tokens_details": {
+            "cached_tokens": 0
+        },
+        "output_tokens": 15,
+        "output_tokens_details": {
+            "reasoning_tokens": 0
+        },
+        "total_tokens": 21
+    },
+    "metadata": {}
+}
+
+== POST /v1/chat/completions with stream: true
+data: {"id": "chatcmpl-021", "object": "chat.completion.chunk", "created": 1791604165, "model": "stub-model-1", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "logprobs": null, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-021", "object": "chat.completion.chunk", "created": 1791604165, "model": "stub-model-1", "choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "call_022", "type": "function", "function": {"name": "get_order_status", "arguments": "{\"order_id\": \"A-1001\"}"}}]}, "logprobs": null, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-021", "object": "chat.completion.chunk", "created": 1791604165, "model": "stub-model-1", "choices": [{"index": 0, "delta": {}, "logprobs": null, "finish_reason": "tool_calls"}]}
+
+data: [DONE]
+
+== POST /v1/responses with stream: true
+event: response.created
+data: {"type": "response.created", "response": {"id": "resp_023", "object": "response", "created_at": 1791604165, "status": "in_progress", "error": null, "incomplete_details": null, "instructions": null, "max_output_tokens": null, "model": "stub-model-1", "output": [], "parallel_tool_calls": true, "previous_response_id": null, "store": false, "temperature": 1.0, "text": {"format": {"type": "text"}}, "tool_choice": "auto", "tools": [{"type": "function", "name": "get_order_status", "parameters": {"type": "object", "properties": {"order_id": {"type": "string"}}}}], "top_p": 1.0, "truncation": "disabled", "usage": null, "metadata": {}}, "sequence_number": 0}
+
+event: response.output_item.added
+data: {"type": "response.output_item.added", "output_index": 0, "item": {"type": "function_call", "id": "fc_024", "call_id": "call_025", "name": "get_order_status", "arguments": "", "status": "in_progress"}, "sequence_number": 1}
+
+event: response.function_call_arguments.delta
+data: {"type": "response.function_call_arguments.delta", "item_id": "fc_024", "output_index": 0, "delta": "{\"order_id\": \"A-1001\"}", "sequence_number": 2}
+
+event: response.function_call_arguments.done
+data: {"type": "response.function_call_arguments.done", "item_id": "fc_024", "output_index": 0, "arguments": "{\"order_id\": \"A-1001\"}", "sequence_number": 3}
+
+event: response.output_item.done
+data: {"type": "response.output_item.done", "output_index": 0, "item": {"type": "function_call", "id": "fc_024", "call_id": "call_025", "name": "get_order_status", "arguments": "{\"order_id\": \"A-1001\"}", "status": "completed"}, "sequence_number": 4}
+
+event: response.completed
+data: {"type": "response.completed", "response": {"id": "resp_023", "object": "response", "created_at": 1791604165, "status": "completed", "error": null, "incomplete_details": null, "instructions": null, "max_output_tokens": null, "model": "stub-model-1", "output": [{"type": "function_call", "id": "fc_024", "call_id": "call_025", "name": "get_order_status", "arguments": "{\"order_id\": \"A-1001\"}", "status": "completed"}], "parallel_tool_calls": true, "previous_response_id": null, "store": false, "temperature": 1.0, "text": {"format": {"type": "text"}}, "tool_choice": "auto", "tools": [{"type": "function", "name": "get_order_status", "parameters": {"type": "object", "properties": {"order_id": {"type": "string"}}}}], "top_p": 1.0, "truncation": "disabled", "usage": {"input_tokens": 10, "input_tokens_details": {"cached_tokens": 0}, "output_tokens": 2, "output_tokens_details": {"reasoning_tokens": 0}, "total_tokens": 12}, "metadata": {}}, "sequence_number": 5}
+
