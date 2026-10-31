@@ -1,3 +1,9 @@
+Two real runs on Linux (Python 3.13, the versions in requirements.txt).
+The article quotes the latency table from run 1 and the HTTP exchanges from run 2.
+Run 2 was made after adding the HTTP 503 handling and the extra curl calls.
+
+############ Run 1: 2026-10-05, ./run_all.sh and node header_size_check.mjs
+
 == Token request (opaque)
 {"access_token":"PVx3RAj1CIivYdbZL1Ogm0tXI8kYLMHwZUL6L5CMpTs","token_type":"Bearer","expires_in":300,"scope":"orders:read"}
 == Token request (jwt), first 60 characters of the response
@@ -109,3 +115,165 @@ after revoke : phantom gateway -> 200
 401 challenge: Bearer error="invalid_token", error_description="Token is not active"
 == Header size check (node header_size_check.mjs)
 v22.22.0 431 Request Header Fields Too Large
+
+############ Run 2: 2026-10-31, ./run_all.sh and node header_size_check.mjs
+
+== Token request (opaque)
+{"access_token":"pBN8uYRmYPk1x0ihW8o3aO8BFZVkFxrw2FaPfFEnjcg","token_type":"Bearer","expires_in":300,"scope":"orders:read"}
+== Token request (jwt), first 60 characters of the response
+{"access_token":"eyJhbGciOiJSUzI1NiIsImtpZCI6ImRlbW8ta2V5LTE
+...
+== Orders API call with the opaque token (introspection route)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+server-timing: auth;dur=16.190
+content-length: 136
+content-type: application/json
+
+{"validated_by":"introspection","client_id":"orders-app","orders":[{"id":"ord_1001","total":"49.90"},{"id":"ord_1002","total":"15.00"}]}
+== Orders API call with the JWT (signature route)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+server-timing: auth;dur=10.995
+content-length: 136
+content-type: application/json
+
+{"validated_by":"jwt-signature","client_id":"orders-app","orders":[{"id":"ord_1001","total":"49.90"},{"id":"ord_1002","total":"15.00"}]}
+== Opaque token sent to the JWT route
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+www-authenticate: Bearer error="invalid_token", error_description="DecodeError"
+content-length: 59
+content-type: application/json
+
+{"error":"invalid_token","error_description":"DecodeError"}
+== Introspection of an active token
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+content-length: 294
+content-type: application/json
+
+{"active":true,"token_type":"Bearer","iss":"http://127.0.0.1:9400","sub":"orders-app","aud":"https://api.example.com/orders","client_id":"orders-app","scope":"orders:read","iat":1793426761,"exp":1793427061,"jti":"ecd1c351-809d-40ff-b0c3-18fe41645bb6","tenant":"acme-retail","plan":"enterprise"}
+== Introspection of an unknown token
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+content-length: 16
+content-type: application/json
+
+{"active":false}
+== Introspection without API credentials
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+www-authenticate: Basic realm="token-service"
+content-length: 26
+content-type: application/json
+
+{"error":"invalid_client"}
+== Introspection asking for the JWT form (phantom token)
+eyJhbGciOiJSUzI1NiIsImtpZCI6ImRlbW8ta2V5LTEiLCJ0eXAiOiJhdCtq
+...
+== JWKS
+{
+    "keys": [
+        {
+            "kty": "RSA",
+            "key_ops": [
+                "verify"
+            ],
+            "n": "shjyJk7pc4wQuQDUAUX-_JzVeMG0Oniiw_ZNYwR5yPoCuOF6igSX
+            "e": "AQAB",
+            "kid": "demo-key-1",
+            "use": "sig",
+            "alg": "RS256"
+        }
+    ]
+}
+== Authorization server metadata
+{
+    "issuer": "http://127.0.0.1:9400",
+    "token_endpoint": "http://127.0.0.1:9400/token",
+    "jwks_uri": "http://127.0.0.1:9400/jwks",
+    "introspection_endpoint": "http://127.0.0.1:9400/introspect",
+    "revocation_endpoint": "http://127.0.0.1:9400/revoke"
+}
+== Orders API call with a token that lacks orders:read
+HTTP/1.1 403 Forbidden
+date: Sat, 31 Oct 2026 06:06:00 GMT
+server: uvicorn
+www-authenticate: Bearer error="insufficient_scope", error_description="orders:read required", scope="orders:read"
+content-length: 73
+content-type: application/json
+
+{"error":"insufficient_scope","error_description":"orders:read required"}
+
+== 1. Token sizes
+opaque token : oJZEhNtOHoHVv5S3miCgRPENY__NyWsNR9keOSCi_-M
+opaque length: 43 characters
+JWT length   : 754 characters
+JWT parts    : header 66 + payload 344 + signature 342
+same claims signed with ES256: 498 characters
+
+== 2. Decoding the JWT payload without any key
+{
+  "iss": "http://127.0.0.1:9400",
+  "sub": "orders-app",
+  "aud": "https://api.example.com/orders",
+  "client_id": "orders-app",
+  "scope": "orders:read",
+  "iat": 1793426761,
+  "exp": 1793427061,
+  "jti": "c49f30c9-4ec5-491f-96e6-4fb27e2985a5",
+  "tenant": "acme-retail",
+  "plan": "enterprise"
+}
+
+== 3. Latency, 1000 sequential requests per mode
+mode                                    p50 ms  p95 ms  p99 ms  check p50  introspections
+(introspections include 50 warm-up calls)
+JWT, local signature check                1.04    1.49    1.94      0.233               0
+Opaque, introspection every call          2.48   14.21   30.69      1.264            1050
+Opaque, introspection + 10 s cache        0.79    2.33    4.92      0.009               1
+Phantom token via gateway                 2.39    5.68   10.07      0.310               1
+
+== 4. Revocation
+before revoke: JWT local       -> 200
+before revoke: opaque cached   -> 200
+before revoke: phantom gateway -> 200
+revoked both tokens at the authorization server (POST /revoke)
+after revoke : JWT local       -> 200
+after revoke : JWT introspected-> 401
+after revoke : opaque introsp. -> 401
+after revoke : opaque cached   -> 200
+after revoke : phantom gateway -> 200
+11 s later  : opaque cached   -> 401
+11 s later  : phantom gateway -> 401
+401 challenge: Bearer error="invalid_token", error_description="Token is not active"
+
+== Authorization server down
+stopped auth_server.py
+-- JWT route
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:23 GMT
+server: uvicorn
+server-timing: auth;dur=0.383
+content-length: 136
+content-type: application/json
+
+{"validated_by":"jwt-signature","client_id":"orders-app","orders":[{"id":"ord_1001","total":"49.90"},{"id":"ord_1002","total":"15.00"}]}
+-- introspection route
+HTTP/1.1 503 Service Unavailable
+date: Sat, 31 Oct 2026 06:06:23 GMT
+server: uvicorn
+retry-after: 5
+content-length: 93
+content-type: application/json
+
+{"error":"temporarily_unavailable","error_description":"Token check failed, try again later"}
+== Header size check (node header_size_check.mjs)
+v22.23.4 431 Request Header Fields Too Large

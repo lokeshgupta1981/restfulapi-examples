@@ -11,10 +11,24 @@ echo "$RESPONSE"
 OPAQUE=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 echo "== Token request (jwt), first 60 characters of the response"
-curl -s -u orders-app:demo-secret-key-123 \
+JWT_RESPONSE=$(curl -s -u orders-app:demo-secret-key-123 \
   -d grant_type=client_credentials -d scope=orders:read -d token_format=jwt \
-  $AS/token | cut -c1-60
+  $AS/token)
+echo "$JWT_RESPONSE" | cut -c1-60
 echo "..."
+JWT=$(echo "$JWT_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+echo "== Orders API call with the opaque token (introspection route)"
+curl -si -H "Authorization: Bearer $OPAQUE" http://127.0.0.1:9401/introspect/orders
+echo
+
+echo "== Orders API call with the JWT (signature route)"
+curl -si -H "Authorization: Bearer $JWT" http://127.0.0.1:9401/jwt/orders
+echo
+
+echo "== Opaque token sent to the JWT route"
+curl -si -H "Authorization: Bearer $OPAQUE" http://127.0.0.1:9401/jwt/orders
+echo
 
 echo "== Introspection of an active token"
 curl -si -u orders-api:demo-introspect-secret-456 -d "token=$OPAQUE" $AS/introspect

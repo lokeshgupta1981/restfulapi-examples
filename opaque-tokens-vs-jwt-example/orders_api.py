@@ -38,14 +38,14 @@ class TokenError(Exception):
 
 @app.exception_handler(TokenError)
 def token_error_handler(request: Request, exc: TokenError):
+    body = {"error": exc.error, "error_description": exc.description}
+    if exc.status == 503:
+        # Not a token problem, so no WWW-Authenticate challenge.
+        return JSONResponse(body, status_code=503, headers={"Retry-After": "5"})
     challenge = f'Bearer error="{exc.error}", error_description="{exc.description}"'
     if exc.error == "insufficient_scope":
         challenge += f', scope="{REQUIRED_SCOPE}"'
-    return JSONResponse(
-        {"error": exc.error, "error_description": exc.description},
-        status_code=exc.status,
-        headers={"WWW-Authenticate": challenge},
-    )
+    return JSONResponse(body, status_code=exc.status, headers={"WWW-Authenticate": challenge})
 
 
 def bearer_token(request: Request) -> str:
@@ -76,8 +76,12 @@ def validate_jwt(token_value: str) -> dict:
 
 
 def introspect(token_value: str) -> dict:
-    response = introspection_client.post(INTROSPECTION_URL, data={"token": token_value})
-    response.raise_for_status()
+    try:
+        response = introspection_client.post(INTROSPECTION_URL, data={"token": token_value})
+        response.raise_for_status()
+    except httpx.HTTPError:
+        # The token may be fine; we just cannot check it right now.
+        raise TokenError(503, "temporarily_unavailable", "Token check failed, try again later")
     claims = response.json()
     if not claims.get("active"):
         raise TokenError(401, "invalid_token", "Token is not active")
