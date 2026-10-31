@@ -1,0 +1,186 @@
+Output of one run on Linux, Python 3.13.18, 2026-10-31 (BASE_PORT=20430 ./run_all.sh).
+Lines starting with "charge ord_" are the Payments API's log; it shares the terminal.
+
+== 1. Asha signs in. Her token is for the Orders API only
+{
+  "sub": "asha",
+  "aud": "orders-api",
+  "scope": "orders:read orders:write",
+  "client_id": "bookstore-web",
+  "exp": 1793430244,
+  "iat": 1793429344
+}
+
+== 2. Orders API forwards Asha's token to the Payments API
+502 {
+  "order_id": "ord_2c6236b7",
+  "status": "payment_failed",
+  "payments_status": 401,
+  "payments_error": "invalid token: Audience doesn't match"
+}
+
+== 3. Token exchange without an actor_token (impersonation)
+200 {
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtp...",
+  "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "scope": "payments:charge"
+}
+{
+  "sub": "asha",
+  "aud": "payments-api",
+  "scope": "payments:charge",
+  "client_id": "orders-api",
+  "exp": 1793429644,
+  "iat": 1793429344
+}
+
+== 4. Token exchange with an actor_token (delegation)
+actor_token claims:
+{
+  "sub": "orders-api",
+  "aud": "http://127.0.0.1:20430",
+  "client_id": "orders-api"
+}
+issued token claims:
+{
+  "sub": "asha",
+  "aud": "payments-api",
+  "scope": "payments:charge",
+  "client_id": "orders-api",
+  "act": {
+    "sub": "orders-api"
+  },
+  "exp": 1793429644,
+  "iat": 1793429344
+}
+
+== 5. Place orders with both kinds of exchanged token
+forward=impersonate:
+charge ord_e3ff530e: customer=asha acting_service=None
+201 {
+  "order_id": "ord_e3ff530e",
+  "customer": "asha",
+  "status": "paid",
+  "payment_token": "new",
+  "payment": {
+    "charge_id": "ch_74783b18",
+    "order_id": "ord_e3ff530e",
+    "amount": 39.0,
+    "customer": "asha",
+    "acting_service": null
+  }
+}
+forward=delegate:
+charge ord_7f2fdc25: customer=asha acting_service=orders-api
+201 {
+  "order_id": "ord_7f2fdc25",
+  "customer": "asha",
+  "status": "paid",
+  "payment_token": "new",
+  "payment": {
+    "charge_id": "ch_4a770be1",
+    "order_id": "ord_7f2fdc25",
+    "amount": 39.0,
+    "customer": "asha",
+    "acting_service": "orders-api"
+  }
+}
+
+== 6. A chain: the Payments API exchanges the delegated token for the Ledger API
+{
+  "sub": "asha",
+  "aud": "ledger-api",
+  "scope": "ledger:write",
+  "act": {
+    "sub": "payments-api",
+    "act": {
+      "sub": "orders-api"
+    }
+  }
+}
+
+== 7. Requests the authorization server refuses
+7a. Orders API asks for a Ledger API token:
+400 {
+  "error": "invalid_target",
+  "error_description": "orders-api may not get tokens for ledger-api"
+}
+7b. Orders API asks for more scope than its policy allows:
+400 {
+  "error": "invalid_scope",
+  "error_description": "allowed scopes: payments:charge"
+}
+7c. Payments API tries to exchange a token that was issued for the Orders API:
+400 {
+  "error": "invalid_request",
+  "error_description": "subject_token rejected: Audience doesn't match"
+}
+7d. Orders API sends the Payments API's own token as actor_token:
+400 {
+  "error": "invalid_request",
+  "error_description": "actor_token does not belong to the client"
+}
+7e. The user token with a changed payload (signature no longer matches):
+400 {
+  "error": "invalid_request",
+  "error_description": "subject_token rejected: Signature verification failed"
+}
+
+== 8. The Payments API checks the current actor
+{
+  "sub": "asha",
+  "aud": "payments-api",
+  "act": {
+    "sub": "reports-api"
+  }
+}
+403 {
+  "detail": "reports-api may not charge customers"
+}
+
+== 9. Caching: ten orders with a fresh user token
+charge ord_c6266c47: customer=asha acting_service=orders-api
+charge ord_cc1d0b44: customer=asha acting_service=orders-api
+charge ord_8ecd6b00: customer=asha acting_service=orders-api
+charge ord_5c695d15: customer=asha acting_service=orders-api
+charge ord_26bc9ff8: customer=asha acting_service=orders-api
+charge ord_1ceabfd4: customer=asha acting_service=orders-api
+charge ord_5c85dba2: customer=asha acting_service=orders-api
+charge ord_2c964f17: customer=asha acting_service=orders-api
+charge ord_e3aa78c3: customer=asha acting_service=orders-api
+charge ord_9171fdf5: customer=asha acting_service=orders-api
+payment_token per order: ['new', 'cached', 'cached', 'cached', 'cached', 'cached', 'cached', 'cached', 'cached', 'cached']
+token exchanges at the authorization server: 1
+== curl: user token
+eyJhbGciOiJSUzI1NiIsImtp...
+== curl: the user token sent straight to the Payments API
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:49:03 GMT
+server: uvicorn
+www-authenticate: Bearer error="invalid_token", error_description="Audience doesn't match"
+content-length: 50
+content-type: application/json
+
+{"detail":"invalid token: Audience doesn't match"}
+== curl: token exchange request (orders-api, demo secret)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:49:03 GMT
+server: uvicorn
+cache-control: no-store
+content-length: 828
+content-type: application/json
+
+{"access_token":"eyJhbGciOiJSUzI1NiIsImtp...","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":300,"scope":"payments:charge"}
+== curl: same request with a resource URL instead of an audience name
+{"access_token":"eyJhbGciOiJSUzI1NiIsImtp...","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":300,"scope":"payments:charge"}
+== curl: token exchange without client authentication
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:49:03 GMT
+server: uvicorn
+cache-control: no-store
+content-length: 77
+content-type: application/json
+
+{"error":"invalid_client","error_description":"client authentication failed"}
