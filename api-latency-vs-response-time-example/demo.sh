@@ -34,3 +34,6 @@ python3 measure.py --url https://localhost:9201/orders/42 -n 500 --csv results-k
 
 echo "== 200 requests with a new connection each time"
 python3 measure.py --url https://localhost:9201/orders/42 -n 200 --new-connection
+
+echo "== 20 calls with httpx: a new connection each time vs one reused client"
+python3 client_reuse.py --url https://localhost:9201/orders/42 -n 20

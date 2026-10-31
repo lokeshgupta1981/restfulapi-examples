@@ -97,3 +97,15 @@ server          30.9    10.3    11.9    12.1   531.6   579.0
 network          0.5     0.5     0.7     0.7     1.2     2.0
 total           31.5    10.9    12.5    13.1   532.3   579.8
 requests slower than the mean: 9 of 200
+
+== Added 2026-10-31: 20 calls with httpx 0.28.1, a new connection each time vs one reused client
+Captured 2026-10-31 on a shared cloud Linux test machine (Python 3.13.18, httpx 0.28.1), last step of ./demo.sh, through the 25 ms proxy.
+20 calls to https://localhost:9201/orders/42
+httpx.get() each time : median  119.1 ms
+one httpx.Client      : median   62.7 ms
+
+== Re-run check 2026-10-31 (same machine type, Python 3.13.18)
+The fixed random seed reproduces the same 17 slow-path requests out of 500 (requests 4, 48, 60, 61, 143,
+160, 169, 182, 195, 250, 257, 262, 297, 340, 439, 476, 481). Percentiles were close to the run above
+(total p50 62.6 ms, p99 585.9 ms; Nagle on: total p50 52.0 ms, Nagle off: 11.2 ms). The network rows
+were noisier on this run because other processes shared the machine.
