@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Orders API as an API Gateway HTTP API, with a JWT authorizer
+
+Parameters:
+  JwtIssuer:
+    Type: String
+    Description: Issuer URL of your identity provider, for example https://cognito-idp.us-east-1.amazonaws.com/<user-pool-id>
+    Default: https://issuer.example.com/
+  JwtAudience:
+    Type: String
+    Description: Expected aud (or client_id) claim in the access token
+    Default: orders-api
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Handler: handler.handler
+    CodeUri: app/
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  OrdersHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # Every route needs a valid JWT in the Authorization header.
+      Auth:
+        DefaultAuthorizer: OrdersJwt
+        Authorizers:
+          OrdersJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Ref JwtIssuer
+              audience:
+                - !Ref JwtAudience
+      # One throttle for all callers of the stage (no per-client limits on HTTP APIs).
+      DefaultRouteSettings:
+        ThrottlingRateLimit: 50
+        ThrottlingBurstLimit: 100
+
+  OrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Events:
+        GetOrder:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OrdersHttpApi
+            Path: /orders/{orderId}
+            Method: GET
+            PayloadFormatVersion: "2.0"
+        CreateOrder:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OrdersHttpApi
+            Path: /orders
+            Method: POST
+            PayloadFormatVersion: "2.0"
+
+Outputs:
+  ApiUrl:
+    Description: Invoke URL of the $default stage (deployed automatically)
+    Value: !Sub "https://${OrdersHttpApi}.execute-api.${AWS::Region}.amazonaws.com"

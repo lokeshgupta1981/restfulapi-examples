@@ -1,0 +1,5 @@
+# Local validation and tests only; the Lambda function itself uses the Python standard library.
+aws-sam-cli==1.171.0
+aws-sam-translator==1.115.0
+cfn-lint==1.58.0
+pytest==9.1.1

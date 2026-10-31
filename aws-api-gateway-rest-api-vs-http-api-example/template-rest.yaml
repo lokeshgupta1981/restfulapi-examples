@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Orders API as an API Gateway REST API, with API keys, a usage plan and request validation
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Handler: handler.handler
+    CodeUri: app/
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  OrdersRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      EndpointConfiguration:
+        Type: REGIONAL
+      # Every method needs an x-api-key header; the usage plan throttles each key.
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          UsagePlanName: orders-partners
+          Throttle:
+            RateLimit: 10
+            BurstLimit: 20
+          Quota:
+            Limit: 10000
+            Period: MONTH
+      # JSON Schema that API Gateway checks before Lambda runs (REST API only).
+      Models:
+        NewOrder:
+          type: object
+          required: [book, quantity]
+          properties:
+            book:
+              type: string
+              minLength: 1
+            quantity:
+              type: integer
+              minimum: 1
+
+  OrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Events:
+        GetOrder:
+          Type: Api
+          Properties:
+            RestApiId: !Ref OrdersRestApi
+            Path: /orders/{orderId}
+            Method: GET
+        CreateOrder:
+          Type: Api
+          Properties:
+            RestApiId: !Ref OrdersRestApi
+            Path: /orders
+            Method: POST
+            RequestModel:
+              Model: NewOrder
+              Required: true
+              ValidateBody: true
+
+Outputs:
+  ApiUrl:
+    Description: Invoke URL of the prod stage
+    Value: !Sub "https://${OrdersRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  ApiKeyId:
+    Description: ID of the generated API key (read its value with aws apigateway get-api-key --include-value)
+    Value: !Ref OrdersRestApiApiKey

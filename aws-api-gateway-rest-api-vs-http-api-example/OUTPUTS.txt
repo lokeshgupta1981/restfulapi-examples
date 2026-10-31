@@ -1,0 +1,106 @@
+### 1. Lint and validate the templates
+cfn-lint template-rest.yaml: no findings
+/home/claude/rf/3072/code/aws-api-gateway-rest-api-vs-http-api-example/template-rest.yaml is a valid SAM Template
+cfn-lint template-http.yaml: no findings
+/home/claude/rf/3072/code/aws-api-gateway-rest-api-vs-http-api-example/template-http.yaml is a valid SAM Template
+
+### 2. What each template turns into (offline SAM transform)
+== template-rest.yaml: 10 resources
+  AWS::ApiGateway::ApiKey                  OrdersRestApiApiKey
+  AWS::ApiGateway::Deployment              OrdersRestApiDeploymenta50df63d9a
+  AWS::ApiGateway::RestApi                 OrdersRestApi
+      method POST /orders  integration=aws_proxy  validator=body-only  security=['api_key']
+      method GET /orders/{orderId}  integration=aws_proxy  validator=None  security=['api_key']
+  AWS::ApiGateway::Stage                   OrdersRestApiprodStage
+      stage=prod  autoDeploy=False
+  AWS::ApiGateway::UsagePlan               OrdersRestApiUsagePlan
+  AWS::ApiGateway::UsagePlanKey            OrdersRestApiUsagePlanKey
+  AWS::IAM::Role                           OrdersFunctionRole
+  AWS::Lambda::Function                    OrdersFunction
+  AWS::Lambda::Permission                  OrdersFunctionCreateOrderPermissionprod
+  AWS::Lambda::Permission                  OrdersFunctionGetOrderPermissionprod
+== template-http.yaml: 6 resources
+  AWS::ApiGatewayV2::Api                   OrdersHttpApi
+      route POST /orders  payloadFormatVersion=2.0  security=['OrdersJwt']
+      route GET /orders/{orderId}  payloadFormatVersion=2.0  security=['OrdersJwt']
+  AWS::ApiGatewayV2::Stage                 OrdersHttpApiApiGatewayDefaultStage
+      stage=$default  autoDeploy=True
+  AWS::IAM::Role                           OrdersFunctionRole
+  AWS::Lambda::Function                    OrdersFunction
+  AWS::Lambda::Permission                  OrdersFunctionGetOrderPermission
+  AWS::Lambda::Permission                  OrdersFunctionCreateOrderPermission
+
+### 3. Unit tests
+10 passed in 0.02s
+
+### 4. Request charges (us-east-1 prices)
+ requests/month     REST API     HTTP API  HTTP saves
+      1,000,000         3.50         1.00        71%
+      5,000,000        17.50         5.00        71%
+    100,000,000       350.00       100.00        71%
+  1,000,000,000     3,033.10       930.00        69%
+
+HTTP API with large payloads (5,000,000 calls):
+     10 KB payload ->    5,000,000 metered requests -> $5.00
+    512 KB payload ->    5,000,000 metered requests -> $5.00
+    600 KB payload ->   10,000,000 metered requests -> $10.00
+   2048 KB payload ->   20,000,000 metered requests -> $20.00
+
+Check against the pricing page examples:
+  HTTP 432 million  -> $418.80 (page: $418.80)
+  REST 5 million    -> $17.50 (page: $17.50)
+
+### 5. The same handler behind both front doors (local stand-in on port 20720)
+
+$ curl http://127.0.0.1:20720/rest/prod/orders/1001 -H 'x-api-key: demo-key-not-real'
+HTTP/1.0 200 OK
+Content-Type: application/json
+Content-Length: 78
+
+{"id": "1001", "book": "REST in Practice", "quantity": 1, "status": "SHIPPED"}
+
+
+$ curl http://127.0.0.1:20720/http/orders/1001 -H 'Authorization: Bearer demo.jwt.not-real'
+HTTP/1.0 200 OK
+Content-Type: application/json
+Content-Length: 78
+
+{"id": "1001", "book": "REST in Practice", "quantity": 1, "status": "SHIPPED"}
+
+
+$ curl -X POST http://127.0.0.1:20720/rest/prod/orders -H 'x-api-key: demo-key-not-real' -H 'Content-Type: application/json' -d '{"book":"RESTful Web APIs","quantity":2}'
+HTTP/1.0 201 Created
+Content-Type: application/json
+Content-Length: 110
+
+{"id": "1002", "book": "RESTful Web APIs", "quantity": 2, "status": "NEW", "createdBy": "api-key:demo-key-id"}
+
+
+$ curl -X POST http://127.0.0.1:20720/http/orders -H 'Authorization: Bearer demo.jwt.not-real' -H 'Content-Type: application/json' -d '{"book":"Designing Web APIs","quantity":1}'
+HTTP/1.0 201 Created
+Content-Type: application/json
+Content-Length: 106
+
+{"id": "1003", "book": "Designing Web APIs", "quantity": 1, "status": "NEW", "createdBy": "jwt:demo-user"}
+
+
+$ curl http://127.0.0.1:20720/rest/prod/health
+HTTP/1.0 502 Bad Gateway
+Content-Type: application/json
+Content-Length: 62
+
+{"message": "local stand-in: malformed Lambda proxy response"}
+
+
+$ curl http://127.0.0.1:20720/http/health
+HTTP/1.0 200 OK
+content-type: application/json
+Content-Length: 16
+
+{"status": "ok"}
+
+### Handler log (one JSON line per call)
+{"format": "1.0", "method": "GET", "path": "/orders/1001", "caller": "api-key:demo-key-id"}
+{"format": "2.0", "method": "GET", "path": "/orders/1001", "caller": "jwt:demo-user"}
+{"format": "1.0", "method": "POST", "path": "/orders", "caller": "api-key:demo-key-id"}
+{"format": "2.0", "method": "POST", "path": "/orders", "caller": "jwt:demo-user"}
