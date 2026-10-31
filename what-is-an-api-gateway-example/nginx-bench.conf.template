@@ -1,0 +1,18 @@
+# Plain reverse proxy used only by bench.sh, to compare the cost of one hop
+# through nginx with the cost of one hop through gateway.py.
+worker_processes 1;
+pid nginx.pid;
+error_log logs/nginx-error.log;
+events { worker_connections 256; }
+http {
+    access_log off;
+    upstream books { server 127.0.0.1:BOOKS_PORT; keepalive 8; }
+    server {
+        listen 127.0.0.1:NGINX_PORT;
+        location /api/books/ {
+            proxy_pass http://books/books/;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+    }
+}

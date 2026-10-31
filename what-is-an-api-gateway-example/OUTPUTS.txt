@@ -1,0 +1,173 @@
+Run: ./demo.sh and ./bench.sh 2000 (three times) on 2026-10-31. Python 3.13.18, fastapi 0.143.0, uvicorn 0.54.0, httpx 0.28.1, nginx 1.24.0, curl 8.5.0.
+Linux, 2 vCPUs (Intel Xeon @ 2.80GHz). Ports were remapped for the run; shown here as the defaults 8000/8001/8002. Request IDs differ on every run.
+
+########## ./demo.sh ##########
+
+== 1. Without the gateway the client must know every service ==
+$ curl -i http://127.0.0.1:8001/books/1
+HTTP/1.1 200 OK
+content-length: 51
+content-type: application/json
+
+{"id":"1","title":"RESTful Web APIs","price":39.99}
+
+
+== 2. No API key ==
+$ curl -i http://localhost:8000/api/orders/1042
+HTTP/1.1 401 Unauthorized
+x-request-id: 495580fb0fd4
+www-authenticate: ApiKey
+content-length: 72
+content-type: application/problem+json
+
+{"type":"about:blank","title":"missing or invalid API key","status":401}
+
+
+== 3. Valid key, routed to the orders service ==
+$ curl -i -H 'X-API-Key: demo-key-mobile-123' http://localhost:8000/api/orders/1042
+HTTP/1.1 200 OK
+x-ratelimit-limit: 5
+x-ratelimit-remaining: 4
+x-request-id: 2a11069bac2b
+content-length: 153
+content-type: application/json
+
+{"id":"1042","client":"mobile-app","bookId":"2","quantity":1,"seenByService":{"X-Client-Id":"mobile-app","X-Request-Id":"2a11069bac2b","X-Api-Key":null}}
+
+
+== 4. Requests that reached the books service so far (case 1 called it directly) ==
+{"service":"books","requestsReceived":1}
+
+== 4a. Book list, first call (cache miss) ==
+$ curl -i -H 'X-API-Key: demo-key-partner-456' http://localhost:8000/api/books
+HTTP/1.1 200 OK
+x-ratelimit-limit: 100
+x-ratelimit-remaining: 99
+x-request-id: 2e07107c0573
+x-cache: MISS
+content-length: 106
+content-type: application/json
+
+[{"id":"1","title":"RESTful Web APIs","price":39.99},{"id":"2","title":"Designing Web APIs","price":44.5}]
+
+
+== 4b. Book list, second call (cache hit) ==
+$ curl -i -H 'X-API-Key: demo-key-partner-456' http://localhost:8000/api/books
+HTTP/1.1 200 OK
+x-ratelimit-limit: 100
+x-ratelimit-remaining: 98
+x-request-id: 94b57ba7201a
+x-cache: HIT
+content-length: 106
+content-type: application/json
+
+[{"id":"1","title":"RESTful Web APIs","price":39.99},{"id":"2","title":"Designing Web APIs","price":44.5}]
+
+
+== 4c. Requests that reached the books service after 4a and 4b ==
+{"service":"books","requestsReceived":2}
+
+== 5. Rate limit: mobile-app may send 5 requests per 10 seconds (case 3 was number 1) ==
+request 2 -> 200
+request 3 -> 200
+request 4 -> 200
+request 5 -> 200
+
+== 5b. The next request is rejected ==
+$ curl -i -H 'X-API-Key: demo-key-mobile-123' http://localhost:8000/api/books/1
+HTTP/1.1 429 Too Many Requests
+x-request-id: 3ce2be2a92d6
+x-ratelimit-limit: 5
+x-ratelimit-remaining: 0
+retry-after: 10
+content-length: 65
+content-type: application/problem+json
+
+{"type":"about:blank","title":"rate limit exceeded","status":429}
+
+
+== 6. Composition: one call, two services ==
+$ curl -i -H 'X-API-Key: demo-key-partner-456' http://localhost:8000/api/order-summary/1042
+HTTP/1.1 200 OK
+x-ratelimit-limit: 100
+x-ratelimit-remaining: 97
+x-request-id: f529b6d792b5
+content-length: 72
+content-type: application/json
+
+{"orderId":"1042","quantity":1,"book":"Designing Web APIs","total":44.5}
+
+
+== 7. Unknown route ==
+$ curl -i -H 'X-API-Key: demo-key-partner-456' http://localhost:8000/api/customers/7
+HTTP/1.1 404 Not Found
+x-request-id: e8f1442aa41d
+x-ratelimit-limit: 100
+x-ratelimit-remaining: 96
+content-length: 68
+content-type: application/problem+json
+
+{"type":"about:blank","title":"no route for this path","status":404}
+
+
+== 8. Slow service, the gateway gives up after 2 seconds ==
+$ curl -i -H 'X-API-Key: demo-key-partner-456' http://localhost:8000/api/books/1/slow
+HTTP/1.1 504 Gateway Timeout
+x-request-id: 850993eb71e2
+x-ratelimit-limit: 100
+x-ratelimit-remaining: 95
+content-length: 72
+content-type: application/problem+json
+
+{"type":"about:blank","title":"upstream service timed out","status":504}
+
+
+== 9. Orders service is down ==
+$ curl -i -H 'X-API-Key: demo-key-partner-456' http://localhost:8000/api/orders/1042
+HTTP/1.1 502 Bad Gateway
+x-request-id: 91582a36a3c1
+x-ratelimit-limit: 100
+x-ratelimit-remaining: 94
+content-length: 74
+content-type: application/problem+json
+
+{"type":"about:blank","title":"upstream service unreachable","status":502}
+
+
+== Gateway access log ==
+gateway id=495580fb0fd4 client=- GET /api/orders/1042 -> 401 cache=- 1.9ms
+gateway id=2a11069bac2b client=mobile-app GET /api/orders/1042 -> 200 cache=- 10.5ms
+gateway id=2e07107c0573 client=partner-shop GET /api/books -> 200 cache=MISS 5.9ms
+gateway id=94b57ba7201a client=partner-shop GET /api/books -> 200 cache=HIT 0.4ms
+gateway id=88a1253c281c client=mobile-app GET /api/books/1 -> 200 cache=- 3.2ms
+gateway id=a55580628047 client=mobile-app GET /api/books/1 -> 200 cache=- 3.0ms
+gateway id=ba463cbe3a25 client=mobile-app GET /api/books/1 -> 200 cache=- 3.5ms
+gateway id=9069d267593e client=mobile-app GET /api/books/1 -> 200 cache=- 3.3ms
+gateway id=3ce2be2a92d6 client=mobile-app GET /api/books/1 -> 429 cache=- 0.9ms
+gateway id=f529b6d792b5 client=partner-shop GET /api/order-summary/1042 -> 200 cache=- 6.8ms
+gateway id=e8f1442aa41d client=partner-shop GET /api/customers/7 -> 404 cache=- 0.6ms
+gateway id=850993eb71e2 client=partner-shop GET /api/books/1/slow -> 504 cache=- 2003.8ms
+gateway id=91582a36a3c1 client=partner-shop GET /api/orders/1042 -> 502 cache=- 1.6ms
+
+########## ./bench.sh 2000 (three runs) ##########
+2000 sequential GET requests per path, keep-alive, all on localhost
+direct to books service : median 1.01 ms, p95 2.81 ms
+through the gateway     : median 3.24 ms, p95 7.94 ms
+through plain nginx     : median 1.18 ms, p95 5.59 ms
+added by gateway.py     : median 2.23 ms
+added by plain nginx    : median 0.17 ms
+
+2000 sequential GET requests per path, keep-alive, all on localhost
+direct to books service : median 1.03 ms, p95 1.52 ms
+through the gateway     : median 3.12 ms, p95 9.00 ms
+through plain nginx     : median 1.04 ms, p95 1.81 ms
+added by gateway.py     : median 2.09 ms
+added by plain nginx    : median 0.01 ms
+
+2000 sequential GET requests per path, keep-alive, all on localhost
+direct to books service : median 1.03 ms, p95 2.04 ms
+through the gateway     : median 3.83 ms, p95 11.48 ms
+through plain nginx     : median 1.24 ms, p95 6.03 ms
+added by gateway.py     : median 2.80 ms
+added by plain nginx    : median 0.21 ms
+
