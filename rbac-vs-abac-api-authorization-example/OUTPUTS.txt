@@ -1,0 +1,216 @@
+# Captured 2026-10-31T06:42:37Z on a clean venv (Linux)
+## python --version
+Python 3.13.18
+## pip install -r requirements.txt (selected packages)
+fastapi==0.143.0
+httpx2==2.13.1
+pydantic==2.14.2
+pytest==9.1.1
+starlette==1.10.0
+uvicorn==0.54.0
+
+## python matrix.py
+Request                        Wanted  RBAC           ABAC           ReBAC          ReBAC+rule    
+carol read launch-plan         allow   allow          allow          allow          allow         
+carol edit launch-plan         deny    deny           deny           deny           deny          
+bob read launch-plan           deny    allow (wrong)  deny           deny           deny          
+bob edit launch-plan           deny    allow (wrong)  deny           deny           deny          
+alice delete launch-plan       allow   deny (wrong)   allow          allow          allow         
+alice edit brand-guide         deny    allow (wrong)  deny           allow (wrong)  deny          
+erin read launch-plan          allow   allow          deny (wrong)   allow          allow         
+erin read pricing-2027         deny    allow (wrong)  deny           deny           deny          
+alice read pricing-2027        allow   allow          deny (wrong)   allow          allow         
+dave delete pricing-2027       allow   allow          allow          allow          allow         
+Wrong decisions                        5              2              1              0             
+
+Why ReBAC lets Erin read launch-plan:
+  folder:marketing-q4#viewer@user:erin
+  document:launch-plan#viewer (via parent folder:marketing-q4)
+
+Why ReBAC lets Carol read launch-plan:
+  group:marketing#member@user:carol
+  folder:marketing-q4#viewer@group:marketing#member
+  document:launch-plan#viewer (via parent folder:marketing-q4)
+
+Why ReBAC lets Dave delete pricing-2027:
+  org:acme#admin@user:dave
+  folder:sales#admin (via org org:acme)
+  document:pricing-2027#can_delete (via parent folder:sales)
+
+## ./demo.sh with AUTHZ_MODEL=rbac
+### Bob (sales editor) edits Alice's launch plan
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":"launch-plan","title":"Bob was here","owner":"alice","department":"marketing","status":"draft"}
+
+
+### Erin (agency) reads the launch plan in the shared folder
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":"launch-plan","title":"Bob was here","owner":"alice","department":"marketing","status":"draft"}
+
+
+### Carol (marketing viewer) edits the launch plan
+HTTP/1.1 403 Forbidden
+content-type: application/json
+
+{"detail":"Not allowed to edit this document"}
+
+
+### Erin lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"rbac","documents":["launch-plan","brand-guide","pricing-2027"]}
+
+
+### Alice lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"rbac","documents":["launch-plan","brand-guide","pricing-2027"]}
+
+
+## ./demo.sh with AUTHZ_MODEL=abac
+### Bob (sales editor) edits Alice's launch plan
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Document not found"}
+
+
+### Erin (agency) reads the launch plan in the shared folder
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Document not found"}
+
+
+### Carol (marketing viewer) edits the launch plan
+HTTP/1.1 403 Forbidden
+content-type: application/json
+
+{"detail":"Not allowed to edit this document"}
+
+
+### Erin lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"abac","documents":[]}
+
+
+### Alice lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"abac","documents":["launch-plan","brand-guide"]}
+
+
+## ./demo.sh with AUTHZ_MODEL=rebac
+### Bob (sales editor) edits Alice's launch plan
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Document not found"}
+
+
+### Erin (agency) reads the launch plan in the shared folder
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":"launch-plan","title":"Q4 launch plan","owner":"alice","department":"marketing","status":"draft"}
+
+
+### Carol (marketing viewer) edits the launch plan
+HTTP/1.1 403 Forbidden
+content-type: application/json
+
+{"detail":"Not allowed to edit this document"}
+
+
+### Erin lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"rebac","documents":["launch-plan","brand-guide"]}
+
+
+### Alice lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"rebac","documents":["launch-plan","brand-guide","pricing-2027"]}
+
+
+## ./demo.sh with AUTHZ_MODEL=authzen
+### Bob (sales editor) edits Alice's launch plan
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Document not found"}
+
+
+### Erin (agency) reads the launch plan in the shared folder
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":"launch-plan","title":"Q4 launch plan","owner":"alice","department":"marketing","status":"draft"}
+
+
+### Carol (marketing viewer) edits the launch plan
+HTTP/1.1 403 Forbidden
+content-type: application/json
+
+{"detail":"Not allowed to edit this document"}
+
+
+### Erin lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"authzen","documents":["launch-plan","brand-guide"]}
+
+
+### Alice lists the documents she can see
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"model":"authzen","documents":["launch-plan","brand-guide","pricing-2027"]}
+
+
+## ./pdp_demo.sh (PDP_MODEL=hybrid)
+### PDP metadata
+{"policy_decision_point":"http://127.0.0.1:20311","access_evaluation_endpoint":"http://127.0.0.1:20311/access/v1/evaluation","access_evaluations_endpoint":"http://127.0.0.1:20311/access/v1/evaluations"}
+
+### Can Erin read launch-plan?
+HTTP/1.1 200 OK
+content-length: 17
+content-type: application/json
+
+{"decision":true}
+
+
+### Can Erin edit launch-plan?
+HTTP/1.1 200 OK
+content-length: 18
+content-type: application/json
+
+{"decision":false}
+
+
+### Batch: can Alice read, edit and delete pricing-2027?
+{"evaluations":[{"decision":true},{"decision":false},{"decision":false}]}
+
+### A caller that is not one of our APIs
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer
+content-type: application/json
+
+{"detail":"Unknown PEP"}
+
+## pytest -q
+..................                                                       [100%]
+18 passed in 0.45s
