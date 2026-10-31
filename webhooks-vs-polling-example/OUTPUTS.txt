@@ -280,3 +280,12 @@ Date: Mon, 05 Oct 2026 04:02:20 GMT
 ETag: "feed-2"
 Cache-Control: no-cache
 
+
+$ python3 webhook_demo.py
+[receiver] listening on http://127.0.0.1:9143/webhooks/orders
+[receiver] webhook   evt_0042 ord_1004 -> shipped
+1. signed event:           204
+2. same event again:       204
+3. body changed:           401
+4. signed 10 minutes ago:  401
+processed: 1, duplicates dropped: 1

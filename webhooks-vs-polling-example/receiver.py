@@ -31,7 +31,7 @@ def valid_signature(secret, headers, body, tolerance=300):
     """Rejects a timestamp more than 5 minutes off, then checks the HMAC."""
     msg_id = headers.get("webhook-id", "")
     timestamp = headers.get("webhook-timestamp", "0")
-    if abs(time.time() - int(timestamp)) > tolerance:
+    if not timestamp.isdigit() or abs(time.time() - int(timestamp)) > tolerance:
         return False
     signed = f"{msg_id}.{timestamp}.".encode() + body
     expected = base64.b64encode(hmac.new(secret.encode(), signed, hashlib.sha256).digest()).decode()

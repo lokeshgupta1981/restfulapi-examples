@@ -1,4 +1,4 @@
-Source code for the article [Webhooks vs API Polling](https://restfulapi.net/webhooks-vs-polling/)
+Source code for the article [Webhooks vs Polling: Which to Use for API Changes](https://restfulapi.net/webhooks-vs-polling/)
 
 # Webhooks vs API polling: a measured comparison
 
@@ -7,6 +7,7 @@ One small Orders API publishes the same stream of 30 order events in two ways, a
 - `provider.py`: the Orders API (port 9140). It publishes events on a change feed, `GET /events?after=<seq>`, with an `ETag` so pollers can send `If-None-Match` and get HTTP 304. It also POSTs every event to a webhook URL, signed with HMAC-SHA256 (`webhook-id`, `webhook-timestamp`, `webhook-signature` headers), and retries a failed delivery after 1 s, 2 s and 4 s before it gives up. It uses this fixed schedule and does not read `Retry-After`.
 - `poller.py`: a polling client with a fixed interval. It records requests, empty answers, HTTP 304 answers and the delay between an event's creation and the moment the client sees it.
 - `receiver.py`: a webhook receiver (port 9141). It checks the signature and timestamp, drops duplicate event ids, answers HTTP 204 at once and processes the event from a queue. With `--reconcile-every N` it also reads the change feed every N seconds and processes any event it never got by webhook (the hybrid pattern). With `--outage START:END` it answers HTTP 503 in that window.
+- `webhook_demo.py`: starts a receiver on port 9143 and sends it four requests: a signed event (HTTP 204), the same event again (HTTP 204, dropped as a duplicate), the same signature with a changed body (HTTP 401) and a signed event with a 10-minute-old timestamp (HTTP 401).
 - `run_experiment.py`: runs both scenarios and prints the tables.
   - Scenario 1: pollers at 1 s, 5 s and 15 s (with ETag), one poller at 5 s without ETag, and the webhook receiver, all watching the same 30 events.
   - Scenario 2: the receiver is down for 21 s, the provider gives up on some events, and the reconciliation poll recovers them.
@@ -16,17 +17,18 @@ The events are generated from a fixed random seed, so the event times are the sa
 
 ## Versions
 
-- Python 3.13 (tested with 3.13.16). Standard library only, no packages to install.
+- Python 3.13 (tested with 3.13.16 and 3.13.18). Standard library only, no packages to install.
 - curl (for `demo.sh`)
 
 The demo uses ports 9140 to 9143 on 127.0.0.1.
 
-## Run
+## How to Run
 
 ```bash
 git clone https://github.com/lokeshgupta1981/restfulapi-examples.git
 cd restfulapi-examples/webhooks-vs-polling-example
 python3 run_experiment.py      # about 3 minutes
+python3 webhook_demo.py
 ./demo.sh
 ```
 
@@ -46,3 +48,5 @@ python3 poller.py --interval 5 --duration 90 --out poll-5.json                 #
 ```
 
 The webhook secret `whsec_demo_secret` is for the demo only. In production, keep secrets out of source code and serve the webhook endpoint over HTTPS.
+
+`OUTPUTS.txt` holds the output of real runs. Delays and request counts differ slightly from run to run.
