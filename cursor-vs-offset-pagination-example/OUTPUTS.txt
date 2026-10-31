@@ -1,0 +1,123 @@
+Output of a real run, Python 3.13.18, fastapi 0.143.0, uvicorn 0.54.0, httpx 0.28.1, SQLite 3.53.1, PostgreSQL 16.15, on 2026-10-31.
+Machine: Linux, 2 vCPUs (Intel Xeon @ 2.80GHz), 7 GB RAM. Timings change from run to run and machine to machine.
+
+########## ./run_all.sh
+########## ./demo.sh
+== 1. Offset: a new order arrives between page 1 and page 2 ==
+$ curl -s "http://localhost:8000/orders/offset?limit=3&offset=0" | jq -c '[.data[].id]'
+[110,109,108]
+$ curl -s -X POST http://localhost:8000/orders -H "Content-Type: application/json" -d '{"customer":"kim","total":25}'
+{"id":111,"created_at":"2026-10-31T06:24:32Z","customer":"kim"}
+$ curl -s "http://localhost:8000/orders/offset?limit=3&offset=3" | jq -c '[.data[].id]'
+[108,107,106]
+
+== 2. Offset: an order on page 1 is deleted before page 2 ==
+$ curl -s "http://localhost:8000/orders/offset?limit=3&offset=0" | jq -c '[.data[].id]'
+[110,109,108]
+$ curl -s -X DELETE http://localhost:8000/orders/109
+HTTP 204
+$ curl -s "http://localhost:8000/orders/offset?limit=3&offset=3" | jq -c '[.data[].id]'
+[106,105,104]
+
+== 3. Cursor: the same two changes ==
+$ curl -s "http://localhost:8000/orders?limit=3"
+{"data":[{"id":110,"created_at":"2026-10-01T10:03:00Z","customer":"judy"},{"id":109,"created_at":"2026-10-01T09:58:00Z","customer":"ivan"},{"id":108,"created_at":"2026-10-01T09:44:00Z","customer":"heidi"}],"next_cursor":"eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0wMVQwOTo0NDowMFoiLCJpZCI6MTA4fQ","has_more":true}
+(created order 111 and deleted order 109)
+$ curl -s "http://localhost:8000/orders?limit=3&cursor=eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0wMVQwOTo0NDowMFoiLCJpZCI6MTA4fQ" | jq -c '[.data[].id]'
+[107,106,105]
+
+== 4. Keyset with the sort values in the URL ==
+$ curl -s "http://localhost:8000/orders/keyset?limit=3" | jq -c '[.data[].id]'
+[110,109,108]
+$ curl -s "http://localhost:8000/orders/keyset?limit=3&before_created_at=2026-10-01T09:44:00Z&before_id=108" | jq -c '[.data[].id]'
+[107,106,105]
+
+== 5. A broken cursor ==
+$ curl -s -i "http://localhost:8000/orders?cursor=not-a-real-cursor"
+HTTP/1.1 400 Bad Request
+content-type: application/json
+
+{"detail":"Invalid cursor. Start again without a cursor."}
+
+$ curl -s "http://localhost:8000/orders?cursor=eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0wMVQwOTo0NDowMFoiLCJpZCI6IjEwOCJ9"   # id is a string
+{"detail":"Invalid cursor. Start again without a cursor."}  (HTTP 400)
+
+== 6. A page size above the maximum (100) ==
+$ curl -s "http://localhost:8000/orders?limit=500"
+{"detail":[{"type":"less_than_equal","loc":["query","limit"],"msg":"Input should be less than or equal to 100","input":"500","ctx":{"le":100}}]}  (HTTP 422)
+########## first page with headers
+$ curl -s -i "http://localhost:8000/orders?limit=3"
+HTTP/1.1 200 OK
+content-length: 301
+content-type: application/json
+link: </orders?limit=3&cursor=eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0wMVQwOTo0NDowMFoiLCJpZCI6MTA4fQ>; rel="next"
+
+{"data":[{"id":110,"created_at":"2026-10-01T10:03:00Z","customer":"judy"},{"id":109,"created_at":"2026-10-01T09:58:00Z","customer":"ivan"},{"id":108,"created_at":"2026-10-01T09:44:00Z","customer":"heidi"}],"next_cursor":"eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0wMVQwOTo0NDowMFoiLCJpZCI6MTA4fQ","has_more":true}
+
+
+########## python client.py
+page 1: [110, 109, 108, 107]
+page 2: [106, 105, 104, 103]
+page 3: [102, 101]
+10 orders in 3 requests
+
+########## python tie_breaker.py
+Sort by created_at only, WHERE created_at < last created_at
+  page: [110, 109, 107]
+  page: [106, 105, 104]
+  page: [102, 103, 101]
+  rows seen: 9  missing: [108]
+Sort by created_at, id; WHERE (created_at, id) < (last created_at, last id)
+  page: [110, 109, 108]
+  page: [107, 106, 105]
+  page: [104, 103, 102]
+  page: [101]
+  rows seen: 10  missing: none
+
+########## python bench.py
+Query plans:
+  SELECT * FROM orders -> SCAN orders USING INDEX idx_orders_created_id
+  SELECT * FROM orders WHERE (created_at, id) < (?, ?) -> SEARCH orders USING INDEX idx_orders_created_id (created_at<?)
+
+1,000,000 rows, page size 20, median of 15 runs
+rows skipped | OFFSET ms | keyset ms | same rows
+           0 |     0.025 |     0.024 | True
+       1,000 |     0.046 |     0.026 | True
+      10,000 |     0.267 |     0.027 | True
+     100,000 |     3.210 |     0.027 | True
+     500,000 |    16.610 |     0.026 | True
+     999,000 |    33.005 |     0.026 | True
+
+########## psql -d pagination_test -f explain.sql
+DROP TABLE
+CREATE TABLE
+INSERT 0 1000000
+CREATE INDEX
+VACUUM
+                                                   QUERY PLAN                                                    
+-----------------------------------------------------------------------------------------------------------------
+ Limit (actual time=78.182..78.186 rows=20 loops=1)
+   Buffers: shared hit=6074 read=1919
+   ->  Index Scan Backward using idx_orders_created_id on orders (actual time=0.045..63.675 rows=500020 loops=1)
+         Buffers: shared hit=6074 read=1919
+ Planning:
+   Buffers: shared hit=43
+ Planning Time: 0.182 ms
+ Execution Time: 78.200 ms
+(8 rows)
+
+       created_at       |   id   
+------------------------+--------
+ 2026-03-28 19:20:15+00 | 500001
+(1 row)
+
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.044..0.049 rows=20 loops=1)
+   Buffers: shared hit=3 read=1
+   ->  Index Scan Backward using idx_orders_created_id on orders (actual time=0.043..0.046 rows=20 loops=1)
+         Index Cond: (ROW(created_at, id) < ROW('2026-03-28 19:20:15+00'::timestamp with time zone, 500001))
+         Buffers: shared hit=3 read=1
+ Planning Time: 0.110 ms
+ Execution Time: 0.096 ms
+(7 rows)
