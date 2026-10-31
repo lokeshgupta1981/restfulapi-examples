@@ -1,0 +1,107 @@
+Captured 2026-10-31 with Python 3.13.18. Servers on ports 20110 (OAUTH_PROFILE=2.0) and 20111 (OAUTH_PROFILE=2.1).
+Tokens and codes are random and change on every run.
+
+$ python client.py http://127.0.0.1:20110 http://127.0.0.1:20111
+== http://127.0.0.1:20110 (Demo OAuth 2.0 server)
+1. implicit grant          : token in the URL fragment: #access_token=2R7o96uA...
+2. password grant          : 200 access_token issued
+3. code without PKCE       : code issued, token 200
+4. PKCE method plain       : code issued
+5. look-alike redirect_uri : 302 -> code sent to bookstore.example.attacker.example
+6. code + PKCE (S256)      : no iss, token 400 (redirect_uri must match the authorization request); with redirect_uri: token 200
+7. bearer token in the URL : ?access_token= -> 200, Authorization header -> 200
+8. refresh token used twice: 1st use 200 (same refresh token), 2nd use 200
+
+== http://127.0.0.1:20111 (Demo OAuth 2.1 server)
+1. implicit grant          : 302 -> error=unsupported_response_type
+2. password grant          : 400 error=unsupported_grant_type
+3. code without PKCE       : 302 -> error=invalid_request (code_challenge is required)
+4. PKCE method plain       : error=invalid_request (code_challenge_method must be S256)
+5. look-alike redirect_uri : 400 -> redirect_uri does not match the registered value
+6. code + PKCE (S256)      : iss=http://127.0.0.1:20111, token 200
+7. bearer token in the URL : ?access_token= -> 401, Authorization header -> 200
+8. refresh token used twice: 1st use 200 (new refresh token), 2nd use 400 refresh token reuse detected, grant revoked; new token afterwards 400
+
+$ V20=http://127.0.0.1:20110 V21=http://127.0.0.1:20111 ./demo.sh
+### 1. Implicit grant (response_type=token)
+--- http://127.0.0.1:20110
+HTTP/1.1 302 Found
+location: https://bookstore.example/callback#access_token=FDGgTgdsSwa9pQ2NzB82Cw&token_type=Bearer&expires_in=600&scope=books%3Aread&state=s1
+--- http://127.0.0.1:20111
+HTTP/1.1 302 Found
+location: https://bookstore.example/callback?error=unsupported_response_type&error_description=the+implicit+grant+is+not+part+of+OAuth+2.1&iss=http%3A%2F%2F127.0.0.1%3A20111&state=s1
+
+### 2. Password grant
+--- http://127.0.0.1:20110
+{"access_token":"hkUXfUVKDa6dqJREYkiSpw","error":null,"error_description":null}
+--- http://127.0.0.1:20111
+{"access_token":null,"error":"unsupported_grant_type","error_description":"the password grant is not part of OAuth 2.1"}
+
+### 3. Authorization code without PKCE
+--- http://127.0.0.1:20110
+HTTP/1.1 302 Found
+location: https://bookstore.example/callback?code=LtnGheWZwbj__K2VeeY_Rg&state=s1
+--- http://127.0.0.1:20111
+HTTP/1.1 302 Found
+location: https://bookstore.example/callback?error=invalid_request&error_description=code_challenge+is+required&iss=http%3A%2F%2F127.0.0.1%3A20111&state=s1
+
+### 4. Look-alike redirect URI
+--- http://127.0.0.1:20110
+HTTP/1.1 302 Found
+location: https://bookstore.example.attacker.example/steal?code=S3F3MSfQ9yvah-MxKXmJfg
+--- http://127.0.0.1:20111
+HTTP/1.1 400 Bad Request
+{"error":"invalid_request","error_description":"redirect_uri does not match the registered value"}
+
+### 5. Bearer token in the query string
+--- http://127.0.0.1:20110
+query string : 200
+header       : 200
+--- http://127.0.0.1:20111
+query string : 401
+header       : 200
+
+### 6. Refresh token used twice (2.1 rotates it)
+--- use 1 of the same refresh token
+{"access_token":"l72abqkP...","refresh_token":"wLBxlPJj..."}
+--- use 2 of the same refresh token
+{"error":"invalid_grant","error_description":"refresh token reuse detected, grant revoked"}
+
+$ V20=http://127.0.0.1:20110 V21=http://127.0.0.1:20111 ./raw.sh
+### Authorization code + PKCE on 2.1 (code_challenge=eCUkdsTeeItsvoF52TCViPYobkoCIJhXqzX0Rfrgo5k)
+location: https://bookstore.example/callback?code=WcUtdeskl8tvKU5DfpbK_Q&iss=http%3A%2F%2F127.0.0.1%3A20111&state=s1
+{"access_token":"kpmX2_J5rj9oS7ztvNZVNA","token_type":"Bearer","expires_in":600,"refresh_token":"yw7SSh6JuaoCX-tt94bTCA","scope":"books:read"}
+### Token in the query string on 2.1
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="bookstore"
+content-length: 25
+content-type: application/json
+
+{"error":"invalid_token"}
+
+### Password grant on 2.0, then on 2.1
+HTTP/1.1 200 OK
+content-length: 142
+content-type: application/json
+
+{"access_token":"2F8zUBu8wJNH1JCBmv3BiA","token_type":"Bearer","expires_in":600,"refresh_token":"NXxBJxC04Ztzr9FxxWB1Gg","scope":"books:read"}
+
+HTTP/1.1 400 Bad Request
+content-length: 100
+content-type: application/json
+
+{"error":"unsupported_grant_type","error_description":"the password grant is not part of OAuth 2.1"}
+
+### Same refresh token twice on 2.1
+HTTP/1.1 200 OK
+content-length: 142
+content-type: application/json
+
+{"access_token":"_0c0msxm47FXcS8kaoGcEA","token_type":"Bearer","expires_in":600,"refresh_token":"nMq-pX1vBJ_ey3jFJnL3qQ","scope":"books:read"}
+
+HTTP/1.1 400 Bad Request
+content-length: 91
+content-type: application/json
+
+{"error":"invalid_grant","error_description":"refresh token reuse detected, grant revoked"}
+
