@@ -1,0 +1,4 @@
+certs/
+dcr_registrations.json
+.venv/
+__pycache__/

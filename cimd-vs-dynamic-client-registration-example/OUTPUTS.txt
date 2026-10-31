@@ -1,0 +1,149 @@
+# Captured 2026-10-31T06:50Z on Python 3.13.18, clean venv from requirements.txt
+# Ports: auth server 29880 (CIMD_ALLOW_LOOPBACK=1), client site 29881, callback 29882, second auth server 29883 (no loopback exception)
+
+################ RUN 1: ./demo.sh
+== 1. Authorization server metadata
+{
+    "issuer": "http://127.0.0.1:29880",
+    "authorization_endpoint": "http://127.0.0.1:29880/authorize",
+    "token_endpoint": "http://127.0.0.1:29880/token",
+    "registration_endpoint": "http://127.0.0.1:29880/register",
+    "client_id_metadata_document_supported": true,
+    "response_types_supported": [
+        "code"
+    ],
+    "grant_types_supported": [
+        "authorization_code"
+    ],
+    "token_endpoint_auth_methods_supported": [
+        "none"
+    ],
+    "code_challenge_methods_supported": [
+        "S256"
+    ],
+    "authorization_response_iss_parameter_supported": true
+}
+
+== 2. DCR: register Orders Desktop
+HTTP/1.1 201 Created
+content-type: application/json
+
+{"client_id":"dcr_Qjg1neMg6sq0ssPW","client_id_issued_at":1793429453,"client_name":"Orders Desktop","redirect_uris":["http://127.0.0.1:29882/callback"],"grant_types":["authorization_code"],"response_types":["code"],"token_endpoint_auth_method":"none"}
+
+
+== 3. DCR: four more installs of the same app register again
+dcr_Lz4fvhDlm7I4tG4K
+dcr_tIU1wMmm0J9dtvpN
+dcr_lXPfdQigiV7y2zTN
+dcr_izrR67MCO0-hkeVZ
+
+== 4. DCR: anyone can register any name
+{
+    "client_id": "dcr_k-53Yffp3HNYElEY",
+    "client_id_issued_at": 1793429453,
+    "client_name": "Orders Desktop",
+    "redirect_uris": [
+        "https://attacker.example/cb"
+    ],
+    "grant_types": [
+        "authorization_code"
+    ],
+    "response_types": [
+        "code"
+    ],
+    "token_endpoint_auth_method": "none"
+}
+
+== 5. CIMD: the client's metadata document
+HTTP/1.1 200 OK
+cache-control: max-age=3600
+content-type: application/json
+
+{"client_id":"https://localhost:29881/oauth/client-metadata.json","client_name":"Orders Desktop","client_uri":"https://localhost:29881","redirect_uris":["http://127.0.0.1:29882/callback"],"grant_types":["authorization_code"],"response_types":["code"],"token_endpoint_auth_method":"none"}
+
+
+== 6. CIMD: five authorization requests with the URL as client_id
+HTTP/1.1 302 Found
+HTTP/1.1 302 Found
+HTTP/1.1 302 Found
+HTTP/1.1 302 Found
+HTTP/1.1 302 Found
+x-demo-consent-screen: Orders Desktop (client from localhost, redirects to 127.0.0.1)
+location: http://127.0.0.1:29882/callback?code=...&state=xyz&iss=http%3A%2F%2F127.0.0.1%3A29880
+
+== 7. What the server stored
+{
+    "dcr_registrations_stored": 6,
+    "cimd_documents_cached": 1,
+    "cimd_fetches": 1
+}
+
+== 8. CIMD: redirect_uri not in the document
+HTTP/1.1 400 Bad Request
+{"error":"invalid_request","error_description":"redirect_uri is not registered for this client"}
+
+== 9. CIMD: document copied to another URL
+HTTP/1.1 400 Bad Request
+{"error":"invalid_client","error_description":"client_id in document (https://localhost:29881/oauth/client-metadata.json) does not match the URL"}
+
+== 10. CIMD: document with a client secret
+HTTP/1.1 400 Bad Request
+{"error":"invalid_client","error_description":"metadata document must not contain a client secret"}
+
+== 11. CIMD: document behind a redirect
+HTTP/1.1 400 Bad Request
+{"error":"invalid_client","error_description":"metadata document returned HTTP 301 (redirects are not followed)"}
+
+== 12. CIMD: document larger than 5 KB
+HTTP/1.1 400 Bad Request
+{"error":"invalid_client","error_description":"metadata document is larger than 5120 bytes"}
+
+== 13. CIMD: client_id pointing at a cloud metadata address
+HTTP/1.1 400 Bad Request
+{"error":"invalid_client","error_description":"169.254.169.254 resolves to 169.254.169.254, a non-public address; not fetched"}
+
+== 14. CIMD: client_id with http
+HTTP/1.1 400 Bad Request
+{"error":"invalid_client","error_description":"client_id URL must use https"}
+
+################ RUN 2: python client.py (auto)
+1. Metadata: client_id_metadata_document_supported=True, registration_endpoint=yes
+2. Server supports Client ID Metadata Documents: our URL is our client_id
+   client_id = https://localhost:29881/oauth/client-metadata.json
+3. Consent screen shows: Orders Desktop (client from localhost, redirects to 127.0.0.1)
+   redirected to http://127.0.0.1:29882/callback with a code, state and iss checked
+4. Token: HTTP 200, Bearer token, expires_in 600
+
+################ RUN 3: python client.py dcr (first run)
+1. Metadata: client_id_metadata_document_supported=True, registration_endpoint=yes
+2. Falling back to Dynamic Client Registration
+   POST http://127.0.0.1:29880/register -> HTTP 201
+   client_id = dcr_sWAkb7dI7-bBTMe2
+3. Consent screen shows: Orders Desktop (client from registration, redirects to 127.0.0.1)
+   redirected to http://127.0.0.1:29882/callback with a code, state and iss checked
+4. Token: HTTP 200, Bearer token, expires_in 600
+
+################ RUN 4: python client.py dcr (second run)
+1. Metadata: client_id_metadata_document_supported=True, registration_endpoint=yes
+2. Falling back to Dynamic Client Registration
+   reusing stored registration for http://127.0.0.1:29880
+   client_id = dcr_sWAkb7dI7-bBTMe2
+3. Consent screen shows: Orders Desktop (client from registration, redirects to 127.0.0.1)
+   redirected to http://127.0.0.1:29882/callback with a code, state and iss checked
+4. Token: HTTP 200, Bearer token, expires_in 600
+
+################ RUN 5: auth server WITHOUT CIMD_ALLOW_LOOPBACK (port 29883): python client.py
+1. Metadata: client_id_metadata_document_supported=True, registration_endpoint=yes
+2. Server supports Client ID Metadata Documents: our URL is our client_id
+   client_id = https://localhost:29881/oauth/client-metadata.json
+3. Authorization failed: HTTP 400 {"error":"invalid_client","error_description":"localhost resolves to 127.0.0.1, a non-public address; not fetched"}
+
+################ auth_server.py log (port 29880)
+[dcr] registered dcr_Qjg1neMg6sq0ssPW as 'Orders Desktop' (1 registrations stored)
+[dcr] registered dcr_Lz4fvhDlm7I4tG4K as 'Orders Desktop' (2 registrations stored)
+[dcr] registered dcr_tIU1wMmm0J9dtvpN as 'Orders Desktop' (3 registrations stored)
+[dcr] registered dcr_lXPfdQigiV7y2zTN as 'Orders Desktop' (4 registrations stored)
+[dcr] registered dcr_izrR67MCO0-hkeVZ as 'Orders Desktop' (5 registrations stored)
+[dcr] registered dcr_k-53Yffp3HNYElEY as 'Orders Desktop' (6 registrations stored)
+[cimd] fetched https://localhost:29881/oauth/client-metadata.json (287 bytes), cached for 3600 s
+[dcr] registered dcr_sWAkb7dI7-bBTMe2 as 'Orders Desktop' (7 registrations stored)
