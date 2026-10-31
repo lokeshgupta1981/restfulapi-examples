@@ -1,6 +1,6 @@
 """The same orders API with the checklist applied.
 
-Run: ORDERS_SECRET_KEY=change-me uvicorn secure_app:app --port 8002
+Run: ORDERS_SECRET_KEY=demo-only-not-a-real-key uvicorn secure_app:app --port 8002
 """
 import logging
 import os

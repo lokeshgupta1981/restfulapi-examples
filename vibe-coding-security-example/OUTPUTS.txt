@@ -1,0 +1,144 @@
+# Captured 2026-10-31T06:08:19Z in a clean venv
+## python --version
+Python 3.13.18
+## pip freeze (packages from requirements.txt)
+email-validator==2.3.0
+fastapi==0.143.0
+httpx2==2.16.0
+pydantic==2.14.0
+pytest==9.2.0
+starlette==1.10.0
+uvicorn==0.54.0
+
+## ./demo.sh http://127.0.0.1:8001   (vulnerable_app, fresh start)
+### 1. alice reads her own order 101
+HTTP/1.1 200 OK
+content-type: application/json
+{"id":101,"user_id":1,"item":"Keyboard","total":89.0}
+
+### 2. alice reads bob's order 201
+HTTP/1.1 200 OK
+content-type: application/json
+{"id":201,"user_id":2,"item":"Monitor","total":249.0}
+
+### 3. alice changes her email and sends role=admin
+HTTP/1.1 200 OK
+content-type: application/json
+{"id":1,"name":"alice","email":"alice@example.org","role":"admin"}
+
+### 4. bob calls an admin route
+HTTP/1.1 200 OK
+content-type: application/json
+[{"id":1,"name":"alice","email":"alice@example.org","role":"admin"},{"id":2,"name":"bob","email":"bob@example.com","role":"customer"},{"id":3,"name":"admin","email":"admin@example.com","role":"admin"}
+
+### 5. bob searches for item x' OR '1'='1
+HTTP/1.1 200 OK
+content-type: application/json
+[{"id":101,"item":"Keyboard","total":89.0},{"id":102,"item":"Mouse","total":29.5},{"id":201,"item":"Monitor","total":249.0}]
+
+### 6. bob sends a field that does not exist
+HTTP/1.1 500 Internal Server Error
+content-type: application/json
+{"error":"no such column: no_such_column","trace":"Traceback (most recent call last):\n  File \".venv/lib/python3.13/site-packages/starlette/middleware/errors.py\", line 164, in __
+
+### 7. a page on https://evil.example calls the API
+HTTP/1.1 401 Unauthorized
+content-type: application/json
+access-control-allow-origin: https://evil.example
+access-control-allow-credentials: true
+{"detail":"missing or invalid token"}
+
+### 8. eight wrong passwords for bob
+401 401 401 401 401 401 401 401 
+
+### 9. one more wrong password for bob
+HTTP/1.1 401 Unauthorized
+content-type: application/json
+{"detail":"wrong name or password"}
+
+
+## ./demo.sh http://127.0.0.1:8002   (secure_app, fresh start)
+### 1. alice reads her own order 101
+HTTP/1.1 200 OK
+content-type: application/json
+{"id":101,"user_id":1,"item":"Keyboard","total":89.0}
+
+### 2. alice reads bob's order 201
+HTTP/1.1 404 Not Found
+content-type: application/json
+{"detail":"order not found"}
+
+### 3. alice changes her email and sends role=admin
+HTTP/1.1 422 Unprocessable Content
+content-type: application/json
+{"detail":[{"type":"extra_forbidden","loc":["body","role"],"msg":"Extra inputs are not permitted","input":"admin"}]}
+
+### 4. bob calls an admin route
+HTTP/1.1 403 Forbidden
+content-type: application/json
+{"detail":"admin role required"}
+
+### 5. bob searches for item x' OR '1'='1
+HTTP/1.1 200 OK
+content-type: application/json
+[]
+
+### 6. bob sends a field that does not exist
+HTTP/1.1 422 Unprocessable Content
+content-type: application/json
+{"detail":[{"type":"extra_forbidden","loc":["body","no_such_column"],"msg":"Extra inputs are not permitted","input":1}]}
+
+### 7. a page on https://evil.example calls the API
+HTTP/1.1 401 Unauthorized
+content-type: application/json
+access-control-allow-credentials: true
+{"detail":"missing or invalid token"}
+
+### 8. eight wrong passwords for bob
+401 401 401 401 401 429 429 429 
+
+### 9. one more wrong password for bob
+HTTP/1.1 429 Too Many Requests
+retry-after: 60
+content-type: application/json
+{"detail":"too many failed logins"}
+
+
+## python security_check.py http://127.0.0.1:8001   (fresh start)
+FAIL  [2] Object-level authorization (BOLA)   alice reads bob's order 201 -> HTTP 200
+FAIL  [4] Mass assignment                     alice sends role=admin -> HTTP 200, role is now admin
+FAIL  [3] Function-level authorization        bob calls GET /admin/users -> HTTP 200
+FAIL  [6] SQL injection                       bob searches item=x' OR '1'='1 -> HTTP 200, 3 orders
+FAIL  [10] Error details                      bad field -> HTTP 500, body {"error":"no such column: no_such_column","trace":"Traceback
+FAIL  [9] CORS                                Origin evil.example -> Access-Control-Allow-Origin: https://evil.example
+FAIL  [7] Login rate limit                    8 wrong passwords -> [401, 401, 401, 401, 401, 401, 401, 401]
+0/7 checks passed
+exit code 1
+
+## python security_check.py http://127.0.0.1:8002   (fresh start)
+PASS  [2] Object-level authorization (BOLA)   alice reads bob's order 201 -> HTTP 404
+PASS  [4] Mass assignment                     alice sends role=admin -> HTTP 422
+PASS  [3] Function-level authorization        bob calls GET /admin/users -> HTTP 403
+PASS  [6] SQL injection                       bob searches item=x' OR '1'='1 -> HTTP 200, 0 orders
+PASS  [10] Error details                      bad field -> HTTP 422, body {"detail":[{"type":"extra_forbidden","loc":["body","no_such_
+PASS  [9] CORS                                Origin evil.example -> Access-Control-Allow-Origin: None
+PASS  [7] Login rate limit                    8 wrong passwords -> [401, 401, 401, 401, 401, 429, 429, 429]
+7/7 checks passed
+exit code 0
+
+## pytest -q
+....                                                                     [100%]
+4 passed in 0.38s
+exit code 0
+
+## APP=vulnerable_app pytest -q
+=========================== short test summary info ============================
+FAILED test_ownership.py::test_other_user_cannot_read_order - AssertionError:...
+FAILED test_ownership.py::test_user_cannot_make_self_admin - AssertionError: ...
+FAILED test_ownership.py::test_customer_cannot_call_admin_route - AssertionEr...
+3 failed, 1 passed in 0.41s
+exit code 1
+
+## uvicorn secure_app:app --port 8003   (without ORDERS_SECRET_KEY)
+  File "<frozen os>", line 717, in __getitem__
+KeyError: 'ORDERS_SECRET_KEY'
