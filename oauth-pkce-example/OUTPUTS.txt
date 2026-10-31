@@ -1,0 +1,171 @@
+# Captured 2026-10-31T06:21Z with Python 3.13.18, Node.js v22.23.4, curl 8.5.0, OpenSSL 3.0.13
+# Server ran on port 20050 here (AUTH_URL=http://127.0.0.1:20050); the default is 8000.
+
+$ python pkce.py
+RFC 7636 Appendix B
+  verifier : dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+  challenge: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  matches  : True
+A fresh pair
+  verifier : EHS5sfyQCQsoPUS_5sYGi6AEf9Mk1AJoqTNvHY5RY74 (43 chars)
+  challenge: VBe79uhNau4iJtM1fXKdo8ZLCloRFQpSP9J1l4OUgv8 (43 chars)
+
+$ node pkce.mjs
+RFC 7636 challenge: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM true
+code_verifier : Xf9Og4zystCb4kk7yiYB09ykYgSD5a2y-23wAZ9fUWw
+code_challenge: fnh4zW8ybkT08a1yy-vzoPvSyDtEEMhb0Qe0fkVHpg8
+
+########## server: PKCE_MODE=required uvicorn server:app
+
+$ curl -s $AUTH_URL/.well-known/oauth-authorization-server | jq .
+{
+  "issuer": "http://127.0.0.1:20050",
+  "authorization_endpoint": "http://127.0.0.1:20050/authorize",
+  "token_endpoint": "http://127.0.0.1:20050/token",
+  "response_types_supported": [
+    "code"
+  ],
+  "grant_types_supported": [
+    "authorization_code"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "none"
+  ],
+  "code_challenge_methods_supported": [
+    "S256"
+  ]
+}
+
+$ ./demo.sh
+== 1. Create the code_verifier and the S256 code_challenge
+code_verifier  = 8WCvK2MVkB1Iucf-ChQawUuPSv_bw11UoxneW51HkA8
+code_challenge = WUML0CBiYKn1sSGkQk-bZY0E5bSiD9v3uUvIlJhcunY
+
+== 2. Authorization request (the app opens this URL in the browser)
+GET http://127.0.0.1:20050/authorize?response_type=code&client_id=bookstore-app&redirect_uri=com.example.bookstore%3A%2Foauth%2Fcallback&state=af0ifjsldkj&code_challenge=WUML0CBiYKn1sSGkQk-bZY0E5bSiD9v3uUvIlJhcunY&code_challenge_method=S256
+HTTP/1.1 302 Found
+location: com.example.bookstore:/oauth/callback?code=qKbkA8ZBXjKJYZp8Bk67sQtghLuCyOjCI2vc_8xjQzM&state=af0ifjsldkj
+
+== 3. Token request with the code_verifier
+HTTP/1.1 200 OK
+cache-control: no-store
+content-type: application/json
+
+{"access_token":"8L5uT8cAybZAUGVXeF6G1yU9kkDZiim9s9GxJUMisec","token_type":"Bearer","expires_in":3600}
+
+
+== 4. Redeeming the same code a second time
+{"error":"invalid_grant","error_description":"unknown, used or expired code"}
+
+== 5. Asking for the plain method
+HTTP/1.1 302 Found
+location: com.example.bookstore:/oauth/callback?error=invalid_request&error_description=code_challenge_method+must+be+S256&state=xyz
+
+$ python client.py
+1. Server metadata: code_challenge_methods_supported = ['S256']
+2. GET http://127.0.0.1:20050/authorize?response_type=code&client_id=bookstore-app&redirect_uri=com.example.bookstore%3A%2Foauth%2Fcallback&state=lP0SlWM-HoV445SeLh1jQQ&code_challenge=m1FuQ4nfTeqU5BEkuyh1NWE3lLxXewVYqm2SALGGYhQ&code_challenge_method=S256
+   -> 302 Location: com.example.bookstore:/oauth/callback?code=vkN62P1QHtP_JiNXYVaRA_1tTqtkaqfBTiy_F9hrKH4&state=lP0SlWM-HoV445SeLh1jQQ
+3. POST /token with code_verifier = _CsAB9Yn4NMMXeDACOLBd5-b_ueI0QQfmmxnPOTx3Po
+   -> 200 {"access_token":"_3_hIjvZ7DmzO5E3x6T3q8LcOquFh2GZ9DjyDIDR7_M","token_type":"Bearer","expires_in":3600}
+4. GET /orders -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+
+$ python attack.py
+Server advertises: ['S256']
+Real app sends a code_challenge: True
+Attempt 1: stolen code, no code_verifier
+  POST /token -> 400 {"error":"invalid_grant","error_description":"code_verifier required"}
+Attempt 2: stolen code, attacker's own code_verifier
+  POST /token -> 400 {"error":"invalid_grant","error_description":"code_verifier does not match code_challenge"}
+
+$ python attack.py --app-without-pkce
+Server advertises: ['S256']
+Real app sends a code_challenge: False
+authorization error: {'error': ['invalid_request'], 'error_description': ['code_challenge required'], 'state': ['Ut6UTEPR-mXDl3NIuxRRBA']}
+
+########## server: PKCE_MODE=off uvicorn server:app
+
+$ curl -s $AUTH_URL/.well-known/oauth-authorization-server | jq .
+{
+  "issuer": "http://127.0.0.1:20050",
+  "authorization_endpoint": "http://127.0.0.1:20050/authorize",
+  "token_endpoint": "http://127.0.0.1:20050/token",
+  "response_types_supported": [
+    "code"
+  ],
+  "grant_types_supported": [
+    "authorization_code"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "none"
+  ]
+}
+
+$ python client.py
+1. Server metadata: code_challenge_methods_supported = (absent)
+   The server does not advertise S256 PKCE, refusing to continue.
+
+$ python attack.py
+Server advertises: no PKCE
+Real app sends a code_challenge: True
+Attempt 1: stolen code, no code_verifier
+  POST /token -> 200 {"access_token":"4gUTE91cG0cjf3hfitfscLpU4oqsHhtp7pxyYspJWIU","token_type":"Bearer","expires_in":3600}
+  GET /orders with the stolen token -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+Attempt 2: stolen code, attacker's own code_verifier
+  POST /token -> 200 {"access_token":"J9yGA1haQZYr7WUOcNBgeNAwX_I8R8LpLC1qVz-Y2kw","token_type":"Bearer","expires_in":3600}
+  GET /orders with the stolen token -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+
+$ python attack.py --app-without-pkce
+Server advertises: no PKCE
+Real app sends a code_challenge: False
+Attempt 1: stolen code, no code_verifier
+  POST /token -> 200 {"access_token":"NTWrvKdk9myg4vbEZAFivgrRvmesQXnn7_X2oRnLoT8","token_type":"Bearer","expires_in":3600}
+  GET /orders with the stolen token -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+Attempt 2: stolen code, attacker's own code_verifier
+  POST /token -> 200 {"access_token":"POFAKSDaNGssiCr6314RmSwuC_R2b25vDc49-wF0tX4","token_type":"Bearer","expires_in":3600}
+  GET /orders with the stolen token -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+
+########## server: PKCE_MODE=optional uvicorn server:app
+
+$ curl -s $AUTH_URL/.well-known/oauth-authorization-server | jq .
+{
+  "issuer": "http://127.0.0.1:20050",
+  "authorization_endpoint": "http://127.0.0.1:20050/authorize",
+  "token_endpoint": "http://127.0.0.1:20050/token",
+  "response_types_supported": [
+    "code"
+  ],
+  "grant_types_supported": [
+    "authorization_code"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "none"
+  ],
+  "code_challenge_methods_supported": [
+    "S256"
+  ]
+}
+
+$ python client.py
+1. Server metadata: code_challenge_methods_supported = ['S256']
+2. GET http://127.0.0.1:20050/authorize?response_type=code&client_id=bookstore-app&redirect_uri=com.example.bookstore%3A%2Foauth%2Fcallback&state=S7eruwmjWVFeL10y19-gFw&code_challenge=Sp5gjOGqqMSfJc2IR15QoRlicq5A7Jrcmcxp55FE2cw&code_challenge_method=S256
+   -> 302 Location: com.example.bookstore:/oauth/callback?code=eBUfLamHQvi4EvXBAijv1f1ZYqrV5_hmNIsVJQk3cQg&state=S7eruwmjWVFeL10y19-gFw
+3. POST /token with code_verifier = dRI8-woIKLzOhEkzsScIj3SbdKL01-Aazrkht7N4Hxo
+   -> 200 {"access_token":"ylJouUKA84JeoYSFHu3dwkSleev-1lt5G163SFFXsnk","token_type":"Bearer","expires_in":3600}
+4. GET /orders -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+
+$ python attack.py
+Server advertises: ['S256']
+Real app sends a code_challenge: True
+Attempt 1: stolen code, no code_verifier
+  POST /token -> 400 {"error":"invalid_grant","error_description":"code_verifier required"}
+Attempt 2: stolen code, attacker's own code_verifier
+  POST /token -> 400 {"error":"invalid_grant","error_description":"code_verifier does not match code_challenge"}
+
+$ python attack.py --app-without-pkce
+Server advertises: ['S256']
+Real app sends a code_challenge: False
+Attempt 1: stolen code, no code_verifier
+  POST /token -> 200 {"access_token":"620CQTJoAnxvLRe2eexu8sZJdG0Ceyc7dssmMTQciXY","token_type":"Bearer","expires_in":3600}
+  GET /orders with the stolen token -> 200 {"user":"asha","orders":[{"id":"ord-1001","book":"REST in Practice","total":39.9},{"id":"ord-1002","book":"Designing Web APIs","total":44.5}]}
+Attempt 2: stolen code, attacker's own code_verifier
+  POST /token -> 400 {"error":"invalid_request","error_description":"code_verifier without code_challenge"}
