@@ -1,0 +1,145 @@
+Output of a real run on 2026-10-31T06:41Z.
+Python 3.13.18, fastapi 0.143.0, pydantic 2.13.5, SQLAlchemy 2.1.6, Node.js v22.23.4, Java 25.0.4.1.
+The apps ran on ports 20300 (vulnerable) and 20301 (secure); the commands below show the default ports 8000 and 8001.
+
+########## ./demo.sh
+########## Vulnerable app (http://localhost:8000)
+$ curl -X POST http://localhost:8000/users -H 'Content-Type: application/json' -d '{"email":"alice@example.com","name":"Alice","password":"alice-pass-1"}'
+HTTP/1.1 201 Created
+{"id":2,"email":"alice@example.com","name":"Alice","password":"alice-pass-1","role":"customer","store_credit":0,"email_verified":false}
+
+
+$ curl -X POST http://localhost:8000/users -H 'Content-Type: application/json' -d '{"email":"mallory@example.com","name":"Mallory","password":"mallory-pass-1","role":"admin","store_credit":500,"email_verified":true}'
+HTTP/1.1 201 Created
+{"id":3,"email":"mallory@example.com","name":"Mallory","password":"mallory-pass-1","role":"admin","store_credit":500,"email_verified":true}
+
+
+$ curl -X PATCH http://localhost:8000/users/me -H 'Content-Type: application/json' -H 'X-User-Id: 2' -d '{"name":"Alice B.","store_credit":1000}'
+HTTP/1.1 200 OK
+{"id":2,"email":"alice@example.com","name":"Alice B.","password":"alice-pass-1","role":"customer","store_credit":1000,"email_verified":false}
+
+
+########## Secure app (http://localhost:8001)
+$ curl -X POST http://localhost:8001/users -H 'Content-Type: application/json' -d '{"email":"alice@example.com","name":"Alice","password":"alice-pass-1"}'
+HTTP/1.1 201 Created
+{"id":2,"email":"alice@example.com","name":"Alice","role":"customer","store_credit":0,"email_verified":false}
+
+
+$ curl -X POST http://localhost:8001/users -H 'Content-Type: application/json' -d '{"email":"mallory@example.com","name":"Mallory","password":"mallory-pass-1","role":"admin","store_credit":500,"email_verified":true}'
+HTTP/1.1 422 Unprocessable Content
+{"detail":[{"type":"extra_forbidden","loc":["body","role"],"msg":"Extra inputs are not permitted","input":"admin"},{"type":"extra_forbidden","loc":["body","store_credit"],"msg":"Extra inputs are not permitted","input":500},{"type":"extra_forbidden","loc":["body","email_verified"],"msg":"Extra inputs are not permitted","input":true}]}
+
+
+$ curl -X PATCH http://localhost:8001/users/me -H 'Content-Type: application/json' -H 'X-User-Id: 2' -d '{"name":"Alice B.","store_credit":1000}'
+HTTP/1.1 422 Unprocessable Content
+{"detail":[{"type":"extra_forbidden","loc":["body","store_credit"],"msg":"Extra inputs are not permitted","input":1000}]}
+
+
+$ curl -X PATCH http://localhost:8001/users/me -H 'Content-Type: application/json' -H 'X-User-Id: 2' -d '{"name":"Alice B."}'
+HTTP/1.1 200 OK
+{"id":2,"email":"alice@example.com","name":"Alice B.","role":"customer","store_credit":0,"email_verified":false}
+
+
+$ curl -X PATCH http://localhost:8001/users/me -H 'Content-Type: application/json' -H 'X-User-Id: 2' -d '{"id":2,"email":"alice@example.com","name":"Alice C.","role":"customer","store_credit":0,"email_verified":false}'
+HTTP/1.1 422 Unprocessable Content
+{"detail":[{"type":"extra_forbidden","loc":["body","id"],"msg":"Extra inputs are not permitted","input":2},{"type":"extra_forbidden","loc":["body","role"],"msg":"Extra inputs are not permitted","input":"customer"},{"type":"extra_forbidden","loc":["body","store_credit"],"msg":"Extra inputs are not permitted","input":0},{"type":"extra_forbidden","loc":["body","email_verified"],"msg":"Extra inputs are not permitted","input":false}]}
+
+
+$ curl -X PATCH http://localhost:8001/admin/users/2 -H 'Content-Type: application/json' -H 'X-User-Id: 2' -d '{"role":"admin"}'
+HTTP/1.1 403 Forbidden
+{"detail":"Admins only"}
+
+
+$ curl -X PATCH http://localhost:8001/admin/users/2 -H 'Content-Type: application/json' -H 'X-User-Id: 1' -d '{"role":"editor"}'
+HTTP/1.1 200 OK
+{"id":2,"email":"alice@example.com","name":"Alice B.","role":"editor","store_credit":0,"email_verified":false}
+
+
+########## python probe.py http://localhost:8000 2   (vulnerable app)
+email           WRITABLE
+name            WRITABLE
+password        WRITABLE
+role            WRITABLE
+store_credit    WRITABLE
+email_verified  WRITABLE
+is_admin        ignored (HTTP 200)
+admin           ignored (HTTP 200)
+is_staff        ignored (HTTP 200)
+verified        ignored (HTTP 200)
+balance         ignored (HTTP 200)
+account_id      ignored (HTTP 200)
+
+########## python probe.py http://localhost:8001 2   (secure app)
+email           WRITABLE
+name            WRITABLE
+role            rejected (HTTP 422)
+store_credit    rejected (HTTP 422)
+email_verified  rejected (HTTP 422)
+password        rejected (HTTP 422)
+is_admin        rejected (HTTP 422)
+admin           rejected (HTTP 422)
+is_staff        rejected (HTTP 422)
+verified        rejected (HTTP 422)
+balance         rejected (HTTP 422)
+account_id      rejected (HTTP 422)
+
+########## pytest -q test_mass_assignment.py   (secure app)
+........                                                                 [100%]
+8 passed in 0.73s
+
+########## APP=vulnerable_app pytest -q test_mass_assignment.py   (fails on purpose)
+E           AssertionError: client set role
+E           AssertionError: client set store_credit
+E           AssertionError: client set email_verified
+E           AssertionError: client set id
+E           AssertionError: client set role
+E           AssertionError: client set store_credit
+E           AssertionError: client set email_verified
+E           AssertionError: client set id
+FAILED test_mass_assignment.py::test_sign_up_cannot_set_server_owned_field[role-admin]
+FAILED test_mass_assignment.py::test_sign_up_cannot_set_server_owned_field[store_credit-500]
+FAILED test_mass_assignment.py::test_sign_up_cannot_set_server_owned_field[email_verified-True]
+FAILED test_mass_assignment.py::test_sign_up_cannot_set_server_owned_field[id-99]
+FAILED test_mass_assignment.py::test_update_me_cannot_set_server_owned_field[role-admin]
+FAILED test_mass_assignment.py::test_update_me_cannot_set_server_owned_field[store_credit-500]
+FAILED test_mass_assignment.py::test_update_me_cannot_set_server_owned_field[email_verified-True]
+FAILED test_mass_assignment.py::test_update_me_cannot_set_server_owned_field[id-777]
+8 failed in 0.67s
+
+########## python extra_modes.py
+ignore  {'name': 'Mallory'}
+forbid  extra_forbidden ('role',) Extra inputs are not permitted
+allow   {'name': 'Mallory', 'role': 'admin'}
+
+########## python patch_unset.py
+model_dump()                   {'email': None, 'name': 'Alice B.'}
+model_dump(exclude_unset=True) {'name': 'Alice B.'}
+
+########## Express (frameworks/express, node app.js)
+$ curl -X PATCH http://localhost:3000/users/2 -H 'Content-Type: application/json' -d '{"name":"Alice B.","role":"admin"}'
+{"error":"Fields not allowed: role"}
+HTTP 422
+
+$ curl -X PATCH http://localhost:3000/vulnerable/users/2 -H 'Content-Type: application/json' -d '{"name":"Alice B.","role":"admin"}'
+{"id":2,"email":"alice@example.com","name":"Alice B.","role":"admin","storeCredit":0}
+HTTP 200
+
+########## Django REST Framework (frameworks/django, python serializers_demo.py)
+AccountSerializerAll   saved role='admin' store_credit=500
+AccountSerializer      saved role='customer' store_credit=0
+
+########## Spring Boot (frameworks/spring, java -jar target/mass-assignment-spring-1.0.0.jar)
+$ curl -X POST http://localhost:8080/vulnerable/users -H 'Content-Type: application/json' -d '{"email":"mallory@example.com","name":"Mallory","password":"mallory-pass-1","role":"admin","storeCredit":500}'
+{"email":"mallory@example.com","id":2,"name":"Mallory","role":"admin","storeCredit":500}
+HTTP 201
+
+$ curl -X POST http://localhost:8080/users -H 'Content-Type: application/json' -d '{"email":"mallory@example.com","name":"Mallory","password":"mallory-pass-1","role":"admin","storeCredit":500}'
+{"timestamp":"2026-10-31T06:41:59.155Z","status":400,"error":"Bad Request","path":"/users"}
+HTTP 400
+
+$ curl ... (same request to /users, app started with --spring.jackson.deserialization.fail-on-unknown-properties=false, the Spring Boot default)
+{"email":"mallory@example.com","id":2,"name":"Mallory","role":"customer","storeCredit":0}
+HTTP 201
+
+Spring log (strict run):
+Resolved [org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Unrecognized property "role" (class com.example.bookstore.SignUpRequest), not marked as ignorable]
