@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# curl calls against python/api_server.py. Needs curl, jq and GNU coreutils base64.
-# Start the server first: python3 python/api_server.py
+# curl calls against server.py. Needs curl, jq and GNU coreutils (base64, basenc).
+# Start the server first: uvicorn server:app --host 127.0.0.1 --port 9170
 set -u
 API="${API_URL:-http://127.0.0.1:9170}"
 cd "$(dirname "$0")"
