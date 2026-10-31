@@ -1,0 +1,159 @@
+# Captured 2026-10-31T06:30:22Z
+## python --version
+Python 3.13.18
+## pip freeze (relevant)
+fastapi==0.143.0
+httpx==0.28.1
+pydantic==2.13.5
+pytest==9.1.1
+starlette==1.7.0
+uvicorn==0.54.0
+
+## python attack.py  (vulnerable_app)
+1000: 404
+1001: 200
+1002: 200 customer 2, Emma, ship to 7 Harbour Road, Shelbyville
+1003: 200 customer 3, Ulysses, ship to 99 Hill Lane, Ogdenville
+1004: 200
+1005: 404
+1006: 404
+1007: 404
+1008: 404
+1009: 404
+1010: 404
+Orders of other customers read: 2
+
+## python attack.py  (secure_app)
+1000: 404
+1001: 200
+1002: 404
+1003: 404
+1004: 200
+1005: 404
+1006: 404
+1007: 404
+1008: 404
+1009: 404
+1010: 404
+Orders of other customers read: 0
+
+## ./demo.sh  (vulnerable_app)
+### 1. Alice reads her own order
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":1001,"customer_id":1,"book":"Dune","total":18.5,"status":"shipped","ship_to":"12 Elm Street, Springfield"}
+
+
+### 2. Alice changes the ID to 1002 (Bob's order)
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":1002,"customer_id":2,"book":"Emma","total":9.99,"status":"paid","ship_to":"7 Harbour Road, Shelbyville"}
+
+
+### 3. Alice asks for Bob's order list with a query parameter
+HTTP/1.1 200 OK
+content-type: application/json
+
+[{"id":1002,"customer_id":2,"book":"Emma","total":9.99,"status":"paid","ship_to":"7 Harbour Road, Shelbyville"}]
+
+
+### 4. Alice cancels Bob's order
+HTTP/1.1 204 No Content
+content-type: application/json
+
+
+
+### 5. Alice ships her order to Bob's saved address
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":1004,"customer_id":1,"book":"Beloved","total":12.0,"status":"paid","ship_to":"7 Harbour Road, Shelbyville"}
+
+
+### 6. Alice reads an order that does not exist
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Order not found"}
+
+
+### 7. No token
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="orders"
+content-type: application/json
+
+{"detail":"Missing or unknown token"}
+
+
+## ./demo.sh  (secure_app)
+### 1. Alice reads her own order
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"id":1001,"customer_id":1,"book":"Dune","total":18.5,"status":"shipped","ship_to":"12 Elm Street, Springfield"}
+
+
+### 2. Alice changes the ID to 1002 (Bob's order)
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Order not found"}
+
+
+### 3. Alice asks for Bob's order list with a query parameter
+HTTP/1.1 200 OK
+content-type: application/json
+
+[{"id":1001,"customer_id":1,"book":"Dune","total":18.5,"status":"shipped","ship_to":"12 Elm Street, Springfield"},{"id":1004,"customer_id":1,"book":"Beloved","total":12.0,"status":"paid","ship_to":"12 Elm Street, Springfield"}]
+
+
+### 4. Alice cancels Bob's order
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Order not found"}
+
+
+### 5. Alice ships her order to Bob's saved address
+HTTP/1.1 422 Unprocessable Content
+content-type: application/json
+
+{"detail":"Unknown address_id"}
+
+
+### 6. Alice reads an order that does not exist
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"detail":"Order not found"}
+
+
+### 7. No token
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="orders"
+content-type: application/json
+
+{"detail":"Missing or unknown token"}
+
+
+## pytest -q  (secure_app)
+.........                                                                [100%]
+9 passed in 0.54s
+
+## APP=vulnerable_app pytest -q -rf --tb=no
+FFF...FFF                                                                [100%]
+=========================== short test summary info ============================
+FAILED test_bola.py::test_other_customer_gets_404[GET] - AssertionError: asse...
+FAILED test_bola.py::test_other_customer_gets_404[PATCH] - AssertionError: as...
+FAILED test_bola.py::test_other_customer_gets_404[DELETE] - AssertionError: a...
+FAILED test_bola.py::test_list_ignores_customer_id_parameter - assert False
+FAILED test_bola.py::test_body_cannot_reference_another_customers_address - a...
+FAILED test_bola.py::test_support_can_read_but_not_cancel - AssertionError: a...
+6 failed, 3 passed in 0.67s
+
+## python random_ids.py
+Random guesses that hit an order: 0 of 10000
+Public review by bob links to order 1165080494753618046
+Alice reads it: HTTP 200 {'id': 1165080494753618046, 'customer_id': 2, 'book': 'Emma', 'total': 9.99, 'status': 'paid', 'ship_to': '7 Harbour Road, Shelbyville'}
