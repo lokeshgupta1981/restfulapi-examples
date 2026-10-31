@@ -1,0 +1,106 @@
+### python discover.py http://127.0.0.1:8000/orders
+1. GET http://127.0.0.1:8000/orders -> HTTP 401
+   WWW-Authenticate: Bearer resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders", scope="orders:read"
+2. GET http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders -> HTTP 200
+   {"resource": "http://127.0.0.1:8000/orders", "authorization_servers": ["http://127.0.0.1:9000"], "scopes_supported": ["orders:read", "orders:write"], "bearer_methods_supported": ["header"], "resource_name": "Orders API", "resource_documentation": "http://127.0.0.1:8000/docs"}
+3. resource matches the URL we called
+4. GET http://127.0.0.1:9000/.well-known/oauth-authorization-server -> HTTP 200
+   token_endpoint: http://127.0.0.1:9000/token
+5. POST http://127.0.0.1:9000/token -> HTTP 200, scope 'orders:read', expires_in 600
+6. GET http://127.0.0.1:8000/orders with token -> HTTP 200, 2 orders
+
+### ./demo.sh
+== 1. Call the API without a token
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+www-authenticate: Bearer resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders", scope="orders:read"
+content-length: 24
+content-type: application/json
+
+{"error":"unauthorized"}
+
+== 2. Read the protected resource metadata
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+content-length: 264
+content-type: application/json
+cache-control: max-age=3600
+
+{"resource":"http://127.0.0.1:8000/orders","authorization_servers":["http://127.0.0.1:9000"],"scopes_supported":["orders:read","orders:write"],"bearer_methods_supported":["header"],"resource_name":"Orders API","resource_documentation":"http://127.0.0.1:8000/docs"}
+
+== 3. The well-known part appended at the end (wrong place)
+HTTP/1.1 404 Not Found
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+content-length: 22
+content-type: application/json
+
+{"detail":"Not Found"}
+
+== 4. Read the authorization server metadata (RFC 8414)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+content-length: 356
+content-type: application/json
+
+{"issuer":"http://127.0.0.1:9000","token_endpoint":"http://127.0.0.1:9000/token","introspection_endpoint":"http://127.0.0.1:9000/introspect","grant_types_supported":["client_credentials"],"token_endpoint_auth_methods_supported":["client_secret_post"],"scopes_supported":["orders:read","orders:write"],"protected_resources":["http://127.0.0.1:8000/orders"]}
+
+== 5. Ask for a token for this resource (RFC 8707 resource parameter)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+content-length: 112
+content-type: application/json
+
+{"access_token":"6B8Ryip-prVrbpDRfY0dKEPyvSW2ldPb","token_type":"Bearer","expires_in":600,"scope":"orders:read"}
+
+== 6. Token with the wrong scope (orders:write only)
+HTTP/1.1 403 Forbidden
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+www-authenticate: Bearer error="insufficient_scope", resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders", scope="orders:read"
+content-length: 30
+content-type: application/json
+
+{"error":"insufficient_scope"}
+
+== 7. Token issued for another resource
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+www-authenticate: Bearer error="invalid_token", resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders", scope="orders:read"
+content-length: 25
+content-type: application/json
+
+{"error":"invalid_token"}
+
+== 8. Token with the right scope and resource
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:16:46 GMT
+server: uvicorn
+content-length: 85
+content-type: application/json
+
+[{"id":101,"item":"Keyboard","total":49.0},{"id":102,"item":"Monitor","total":189.0}]
+
+### PRM_NO_HEADER=1: the 401 has no resource_metadata, the client builds the well-known URL
+1. GET http://127.0.0.1:8000/orders -> HTTP 401
+   WWW-Authenticate: Bearer scope="orders:read"
+2. GET http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders -> HTTP 200
+   {"resource": "http://127.0.0.1:8000/orders", "authorization_servers": ["http://127.0.0.1:9000"], "scopes_supported": ["orders:read", "orders:write"], "bearer_methods_supported": ["header"], "resource_name": "Orders API", "resource_documentation": "http://127.0.0.1:8000/docs"}
+3. resource matches the URL we called
+4. GET http://127.0.0.1:9000/.well-known/oauth-authorization-server -> HTTP 200
+   token_endpoint: http://127.0.0.1:9000/token
+5. POST http://127.0.0.1:9000/token -> HTTP 200, scope 'orders:read', expires_in 600
+6. GET http://127.0.0.1:8000/orders with token -> HTTP 200, 2 orders
+
+### PRM_FAKE_RESOURCE=1: the metadata describes another resource
+1. GET http://127.0.0.1:8000/orders -> HTTP 401
+   WWW-Authenticate: Bearer resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders", scope="orders:read"
+2. GET http://127.0.0.1:8000/.well-known/oauth-protected-resource/orders -> HTTP 200
+   {"resource": "https://orders.attacker.example/orders", "authorization_servers": ["https://login.attacker.example"], "scopes_supported": ["orders:read", "orders:write"], "bearer_methods_supported": ["header"], "resource_name": "Orders API", "resource_documentation": "http://127.0.0.1:8000/docs"}
+3. STOP: resource 'https://orders.attacker.example/orders' does not match 'http://127.0.0.1:8000/orders', metadata not used
+exit code 1

@@ -1,35 +1,53 @@
-# OAuth 2.0 Protected Resource Metadata (RFC 9728) example
+# OAuth Protected Resource Metadata (RFC 9728) Example
 
-Source code for the article https://restfulapi.net/oauth-protected-resource-metadata/
+Source code for the article [OAuth Protected Resource Metadata (RFC 9728)](https://restfulapi.net/oauth-protected-resource-metadata/)
 
-An orders API publishes RFC 9728 protected resource metadata and points to it from its HTTP 401 responses. A Python client starts from the API URL alone, finds the authorization server, validates both metadata documents, gets a token and calls the API.
+An orders API publishes RFC 9728 protected resource metadata and points to it from its HTTP 401 and HTTP 403 responses. A Python client starts from the API URL alone, finds the authorization server, validates both metadata documents, gets a token for this API only, and calls the API. A curl script shows every HTTP exchange on the wire.
 
-- `resource_server.py`: orders API on port 8000. Serves `/.well-known/oauth-protected-resource/orders`, answers 401 and 403 with `WWW-Authenticate: Bearer resource_metadata="...", scope="orders:read"`, and rejects tokens issued for another resource.
-- `auth_server.py`: test authorization server on port 9000 with RFC 8414 metadata, a client credentials token endpoint and token introspection. For local testing only.
-- `discover.py`: the client. It follows the `resource_metadata` URL, or tries the path-based and root well-known URLs when the header has none, and stops when `resource` does not match the URL it called.
+## Files
+
+| File | Port | What it does |
+|---|---|---|
+| resource_server.py | 8000 | Orders API. Serves `/.well-known/oauth-protected-resource/orders` with `Cache-Control: max-age=3600`, answers 401 and 403 with `WWW-Authenticate: Bearer resource_metadata="...", scope="orders:read"`, and rejects tokens issued for another resource |
+| auth_server.py | 9000 | Test authorization server with RFC 8414 metadata, a client credentials token endpoint and token introspection (RFC 7662). For local testing only |
+| discover.py | - | The client. Follows the `resource_metadata` URL, or builds the path-based and root well-known URLs when the header has none, and stops when `resource` does not match the URL it called |
+| demo.sh | - | Raw HTTP exchanges with curl: the 401, both metadata documents, a 404 for the wrong well-known URL, a token request, and the 403 and 401 for a wrong scope and a wrong resource |
+| run_all.sh | - | Starts both servers, runs everything above plus the two failure modes, and writes OUTPUTS.txt |
 
 The example uses `http` on 127.0.0.1. A real resource identifier uses `https`.
 
+The client ID `orders-cli` and the secret `orders-cli-secret` are demo values. Never use them outside this example.
+
 ## Versions
 
-Python 3.10 or later, FastAPI 0.143.0, Uvicorn 0.54.0, python-multipart 0.0.32. The client uses only the standard library.
+- Python 3.13 (3.10 or later works)
+- fastapi 0.143.0, uvicorn 0.54.0, python-multipart 0.0.32
+- The client uses only the standard library; demo.sh needs curl
 
-## Run
+## How to Run
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# terminal 1
-uvicorn auth_server:app --port 9000
-# terminal 2
-uvicorn resource_server:app --port 8000
-# terminal 3
-python discover.py http://127.0.0.1:8000/orders
+./run_all.sh
 ```
 
-## Expected output
+Or step by step, each in its own terminal:
+
+```bash
+uvicorn auth_server:app --port 9000
+uvicorn resource_server:app --port 8000
+python discover.py http://127.0.0.1:8000/orders
+./demo.sh
+```
+
+Two environment variables on the API change its behaviour:
+
+- `PRM_NO_HEADER=1` leaves `resource_metadata` out of the 401 challenge. The client then builds the well-known URL itself and still succeeds.
+- `PRM_FAKE_RESOURCE=1` publishes metadata for another resource with another authorization server. The client stops at step 3 with exit code 1.
+
+## Expected Output
 
 ```text
 1. GET http://127.0.0.1:8000/orders -> HTTP 401
@@ -43,22 +61,4 @@ python discover.py http://127.0.0.1:8000/orders
 6. GET http://127.0.0.1:8000/orders with token -> HTTP 200, 2 orders
 ```
 
-## Test the validation rule
-
-Restart the API with `PRM_FAKE_RESOURCE=1` (PowerShell: `$env:PRM_FAKE_RESOURCE=1`). The metadata then describes another resource, and the client stops at step 3 with exit code 1.
-
-```text
-3. STOP: resource 'https://orders.attacker.example/orders' does not match 'http://127.0.0.1:8000/orders', metadata not used
-```
-
-## Test scope and audience errors with curl
-
-```bash
-TOKEN=$(curl -s -X POST http://127.0.0.1:9000/token -d grant_type=client_credentials \
-  -d client_id=orders-cli -d client_secret=orders-cli-secret \
-  -d scope=orders:write -d resource=http://127.0.0.1:8000/orders | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
-curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/orders
-# HTTP 403, WWW-Authenticate: Bearer error="insufficient_scope", resource_metadata="...", scope="orders:read"
-```
-
-A token requested with `resource=https://other.example/api` gets HTTP 401 with `error="invalid_token"`.
+OUTPUTS.txt holds the full output of one run of run_all.sh on Linux (2026-10-31). Dates and access tokens differ on every run.
