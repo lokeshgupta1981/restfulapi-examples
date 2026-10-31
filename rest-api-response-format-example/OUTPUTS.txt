@@ -1,0 +1,327 @@
+$ ./demo.sh
+
+### 1. Default FastAPI errors: missing book
+HTTP/1.1 404 Not Found
+content-length: 43
+content-type: application/json
+
+{
+  "detail": "There is no book with id 9999."
+}
+
+### 2. Default FastAPI errors: unknown URL
+HTTP/1.1 404 Not Found
+content-length: 22
+content-type: application/json
+
+{
+  "detail": "Not Found"
+}
+
+### 3. Default FastAPI errors: invalid body
+HTTP/1.1 422 Unprocessable Content
+content-length: 374
+content-type: application/json
+
+{
+  "detail": [
+    {
+      "type": "string_pattern_mismatch",
+      "loc": [
+        "body",
+        "price",
+        "currency"
+      ],
+      "msg": "String should match pattern '^[A-Z]{3}$'",
+      "input": "usd",
+      "ctx": {
+        "pattern": "^[A-Z]{3}$"
+      }
+    },
+    {
+      "type": "missing",
+      "loc": [
+        "body",
+        "publishedOn"
+      ],
+      "msg": "Field required",
+      "input": {
+        "title": "API Design Patterns",
+        "author": "JJ Geewax",
+        "isbn": "9781617295850",
+        "price": {
+          "amount": "59.99",
+          "currency": "usd"
+        }
+      }
+    }
+  ]
+}
+
+### 4. Envelope with 200 for everything: missing book
+HTTP/1.1 200 OK
+content-length: 101
+content-type: application/json
+
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "There is no book with id 9999."
+  }
+}
+
+### 5. A single book
+HTTP/1.1 200 OK
+content-length: 215
+content-type: application/json
+
+{
+  "id": "1001",
+  "title": "RESTful Web APIs",
+  "subtitle": null,
+  "author": "Leonard Richardson",
+  "isbn": "9781449358068",
+  "price": {
+    "amount": "39.99",
+    "currency": "USD"
+  },
+  "publishedOn": "2013-09-01",
+  "createdAt": "2026-10-01T08:30:00Z"
+}
+
+### 6. First page of books
+HTTP/1.1 200 OK
+content-length: 528
+content-type: application/json
+
+{
+  "items": [
+    {
+      "id": "1001",
+      "title": "RESTful Web APIs",
+      "subtitle": null,
+      "author": "Leonard Richardson",
+      "isbn": "9781449358068",
+      "price": {
+        "amount": "39.99",
+        "currency": "USD"
+      },
+      "publishedOn": "2013-09-01",
+      "createdAt": "2026-10-01T08:30:00Z"
+    },
+    {
+      "id": "1002",
+      "title": "Designing Web APIs",
+      "subtitle": "Building APIs That Developers Love",
+      "author": "Brenda Jin",
+      "isbn": "9781492026921",
+      "price": {
+        "amount": "44.99",
+        "currency": "USD"
+      },
+      "publishedOn": "2018-09-01",
+      "createdAt": "2026-10-02T09:00:00Z"
+    }
+  ],
+  "next": "http://localhost:9120/books?limit=2&cursor=MTAwMg"
+}
+
+### 7. Following the next link
+HTTP/1.1 200 OK
+content-length: 497
+content-type: application/json
+
+{
+  "items": [
+    {
+      "id": "1003",
+      "title": "API Design Patterns",
+      "subtitle": null,
+      "author": "JJ Geewax",
+      "isbn": "9781617295850",
+      "price": {
+        "amount": "59.99",
+        "currency": "USD"
+      },
+      "publishedOn": "2021-07-01",
+      "createdAt": "2026-10-03T10:15:00Z"
+    },
+    {
+      "id": "1004",
+      "title": "The Design of Web APIs",
+      "subtitle": null,
+      "author": "Arnaud Lauret",
+      "isbn": "9781617295102",
+      "price": {
+        "amount": "49.99",
+        "currency": "USD"
+      },
+      "publishedOn": "2019-10-01",
+      "createdAt": "2026-10-04T11:45:00Z"
+    }
+  ],
+  "next": "http://localhost:9120/books?limit=2&cursor=MTAwNA"
+}
+
+### 8. A filter that matches nothing
+HTTP/1.1 200 OK
+content-length: 24
+content-type: application/json
+
+{
+  "items": [],
+  "next": null
+}
+
+### 9. Create a book
+HTTP/1.1 201 Created
+content-length: 207
+content-type: application/json
+location: /books/1006
+
+{
+  "id": "1006",
+  "title": "REST in Practice",
+  "subtitle": null,
+  "author": "Jim Webber",
+  "isbn": "9780596805821",
+  "price": {
+    "amount": "34.99",
+    "currency": "USD"
+  },
+  "publishedOn": "2010-09-01",
+  "createdAt": "2026-10-31T06:23:49Z"
+}
+
+### 10. Delete it
+HTTP/1.1 204 No Content
+
+
+### 11. Missing book
+HTTP/1.1 404 Not Found
+content-length: 162
+content-type: application/problem+json
+
+{
+  "type": "https://api.example.com/problems/not-found",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "There is no book with id 9999.",
+  "instance": "/books/9999"
+}
+
+### 12. Invalid body
+HTTP/1.1 422 Unprocessable Content
+content-length: 316
+content-type: application/problem+json
+
+{
+  "type": "https://api.example.com/problems/validation-error",
+  "title": "Your request is not valid",
+  "status": 422,
+  "detail": "2 field(s) failed validation.",
+  "instance": "/books",
+  "errors": [
+    {
+      "pointer": "/price/currency",
+      "detail": "String should match pattern '^[A-Z]{3}$'"
+    },
+    {
+      "pointer": "/publishedOn",
+      "detail": "Field required"
+    }
+  ]
+}
+
+### 13. Malformed JSON
+HTTP/1.1 400 Bad Request
+content-length: 163
+content-type: application/problem+json
+
+{
+  "type": "https://api.example.com/problems/malformed-json",
+  "title": "Malformed JSON",
+  "status": 400,
+  "detail": "The request body is not valid JSON.",
+  "instance": "/books"
+}
+
+### 14. Wrong method
+HTTP/1.1 405 Method Not Allowed
+allow: DELETE, GET
+content-length: 167
+content-type: application/problem+json
+
+{
+  "type": "https://api.example.com/problems/method-not-allowed",
+  "title": "Method not allowed",
+  "status": 405,
+  "detail": "PUT is not supported here.",
+  "instance": "/books/1001"
+}
+
+### 15. Invalid page size
+HTTP/1.1 422 Unprocessable Content
+content-length: 255
+content-type: application/problem+json
+
+{
+  "type": "https://api.example.com/problems/validation-error",
+  "title": "Your request is not valid",
+  "status": 422,
+  "detail": "1 field(s) failed validation.",
+  "instance": "/books",
+  "errors": [
+    {
+      "parameter": "limit",
+      "detail": "Input should be less than or equal to 50"
+    }
+  ]
+}
+
+### 16. What curl --fail sees (exit code 22 means an HTTP error)
+envelope:     exit code 0
+status codes: exit code 22
+
+$ python3 client.py
+Envelope, existing book: RESTful Web APIs
+Envelope, missing book: TypeError: 'NoneType' object is not subscriptable
+Status codes, existing book: RESTful Web APIs
+Status codes, missing book: ApiError: 404 Resource not found: There is no book with id 9999.
+Create with bad body: ApiError: 422 Your request is not valid: 2 field(s) failed validation.
+    /price/currency -> String should match pattern '^[A-Z]{3}$'
+    /publishedOn -> Field required
+All titles (3 pages): ['RESTful Web APIs', 'Designing Web APIs', 'API Design Patterns', 'The Design of Web APIs', 'Building Microservices']
+
+$ node big_ids.js
+Number.MAX_SAFE_INTEGER: 9007199254740991
+orderId as number:       9007199254740992
+orderId as string:       9007199254740993
+Same order?              false
+0.1 + 0.2 = 0.30000000000000004
+
+$ pytest -v
+collecting ... collected 14 items
+
+test_format.py::test_every_error_is_problem_details[GET-/books/9999-None-404] PASSED [  7%]
+test_format.py::test_every_error_is_problem_details[GET-/no-such-url-None-404] PASSED [ 14%]
+test_format.py::test_every_error_is_problem_details[PUT-/books/1001-None-405] PASSED [ 21%]
+test_format.py::test_every_error_is_problem_details[GET-/books?limit=0-None-422] PASSED [ 28%]
+test_format.py::test_every_error_is_problem_details[GET-/books?cursor=@@@-None-400] PASSED [ 35%]
+test_format.py::test_every_error_is_problem_details[POST-/books-body5-422] PASSED [ 42%]
+test_format.py::test_every_error_is_problem_details[DELETE-/books/9999-None-404] PASSED [ 50%]
+test_format.py::test_unexpected_crash_is_problem_details_without_internals PASSED [ 57%]
+test_format.py::test_validation_errors_point_at_fields PASSED            [ 64%]
+test_format.py::test_single_book_is_the_plain_object PASSED              [ 71%]
+test_format.py::test_list_is_an_object_with_items_and_next PASSED        [ 78%]
+test_format.py::test_last_page_has_null_next_and_empty_result_is_200 PASSED [ 85%]
+test_format.py::test_create_returns_201_location_and_the_new_book PASSED [ 92%]
+test_format.py::test_delete_returns_204_without_a_body PASSED            [100%]
+
+============================== 14 passed in 0.47s ==============================
+
+# uvicorn access log of app.py: the last two requests for book 9999 (sent by client.py)
+INFO:     127.0.0.1:51486 - "GET /envelope/books/9999 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51500 - "GET /books/9999 HTTP/1.1" 404 Not Found
