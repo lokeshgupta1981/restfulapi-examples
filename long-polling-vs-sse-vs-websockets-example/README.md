@@ -6,7 +6,7 @@ One FastAPI app keeps an in-memory event log of order status changes and deliver
 
 | Endpoint | Technique |
 |---|---|
-| `GET /orders/{id}/updates?after=N` | Long polling. Returns at once when events newer than `N` exist, otherwise holds the request for up to 25 s (`LONG_POLL_WAIT`) and returns an empty list. |
+| `GET /orders/{id}/updates?after=N` | Long polling. Returns at once when events newer than `N` exist, otherwise holds the request for up to 25 s (`LONG_POLL_WAIT`) and returns an empty list. With `&wait=0` it answers at once, which is plain polling. |
 | `GET /orders/{id}/stream` | Server-sent events (`text/event-stream`). Sends `retry: 3000`, one `id`/`event`/`data` block per event, a `: ping` comment every 15 s (`HEARTBEAT`), and resumes from the `Last-Event-ID` request header (or `?after=N`). |
 | `WS /orders/{id}/socket?after=N` | WebSocket. Sends each event as a JSON text message and accepts `{"action": "cancel"}` from the client. |
 | `POST /orders/{id}/events` | Publishes an event, body `{"status": "shipped"}`. |
@@ -18,6 +18,7 @@ Files:
 - `index.html`: browser page served at `/` with one panel per technique (`fetch()` loop, `EventSource`, `WebSocket` with reconnect and backoff).
 - `demo.sh`: curl calls that show the wire format of each technique.
 - `ws_client.py`: WebSocket client that receives an event and sends a message on the same connection.
+- `polling_cost.py`: runs a plain polling client (every 2 s, `wait=0`) and a long polling client for 60 s while three events are published, and prints requests, empty answers, delay and bytes (ports 9157-9158).
 - `measure.py`: runs one client per technique at the same time through small byte-counting TCP proxies (ports 9152-9154) and prints latency, requests and bytes. `NETWORK_DELAY_MS=50` adds a one-way delay, `WS_DEFLATE=1` turns on WebSocket compression.
 - `nginx-proxy.conf`: nginx settings for all three techniques.
 - `OUTPUTS.txt`: output captured from these scripts.
@@ -40,6 +41,7 @@ pip install -r requirements.txt
 
 uvicorn server:app --port 9150     # terminal 1
 ./demo.sh                          # terminal 2 (takes about 35 s)
+python polling_cost.py 60 2        # plain polling every 2 s vs long polling, 60 s
 python measure.py 20 0.5           # 20 events, one every 500 ms
 NETWORK_DELAY_MS=50 python measure.py 20 0.02
 python measure.py 20 0.5 60        # also measures 60 s of idle time

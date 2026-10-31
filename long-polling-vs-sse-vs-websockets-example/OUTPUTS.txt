@@ -188,3 +188,94 @@ ws://127.0.0.1:9151/orders/idle2/socket: still open after 75.0 s (server sends a
 
 ===== Sample nginx-proxy.conf (port changed to 9156, self-signed cert, gzip on in http block)
 SSE, long poll and wss all returned event 1 through it.
+
+===== Re-run on 2026-10-31 (Linux, Python 3.13.18, fastapi 0.142.2, uvicorn 0.54.0, websockets 17.2, httpx 0.28.1)
+
+== ./demo.sh (fresh server)
+### 1. Publish an event
+HTTP/1.1 201 Created
+date: Sat, 31 Oct 2026 06:06:18 GMT
+server: uvicorn
+content-length: 69
+content-type: application/json
+
+{"id":1,"order_id":"1042","status":"packed","sent_at":1793426779.397}
+
+### 2. Long poll: an event newer than id 0 exists, so the answer comes at once
+{"events":[{"id":1,"order_id":"1042","status":"packed","sent_at":1793426779.397}],"last_id":1}
+(0.018342 s)
+
+### 3. Long poll: nothing newer than id 1, the server holds the request
+{"events":[{"id":2,"order_id":"1042","status":"shipped","sent_at":1793426781.445}],"last_id":2}
+(1.997697 s)
+
+### 4. Long poll: nothing arrives, the server answers after LONG_POLL_WAIT (25 s)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:20 GMT
+server: uvicorn
+cache-control: no-store
+content-length: 25
+content-type: application/json
+
+{"events":[],"last_id":2}
+(25.001513 s)
+
+### 5. SSE: one response that stays open, starting after id 2 (curl stops after 4 s)
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:06:45 GMT
+server: uvicorn
+cache-control: no-store
+x-accel-buffering: no
+content-type: text/event-stream; charset=utf-8
+transfer-encoding: chunked
+
+retry: 3000
+
+id: 3
+event: status
+data: {"id": 3, "order_id": "1042", "status": "out_for_delivery", "sent_at": 1793426808.472}
+
+
+### 6. SSE: reconnect with Last-Event-ID: 2
+retry: 3000
+
+id: 3
+event: status
+data: {"id": 3, "order_id": "1042", "status": "out_for_delivery", "sent_at": 1793426808.472}
+
+
+### 7. WebSocket opening handshake (curl prints the HTTP 101 and stops)
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+date: Sat, 31 Oct 2026 06:06:51 GMT
+server: uvicorn
+
+### 8. WebSocket: messages in both directions on one connection
+< {"id": 3, "order_id": "1042", "status": "out_for_delivery", "sent_at": 1793426808.472}
+> {"action": "cancel"}
+< {"id": 4, "order_id": "1042", "status": "cancel_requested", "sent_at": 1793426813.663}
+
+$ curl -s "http://127.0.0.1:9150/orders/1042/updates?after=4&wait=0"   (plain poll, nothing new)
+{"events":[],"last_id":4}
+
+$ python polling_cost.py 60 2
+60 s, 3 events, plain polling every 2 s
+technique       received  requests  empty   p50 ms   max ms  bytes total
+plain polling          3        30     27    815.5   1060.9        11081
+long polling           3         3      0      1.3      2.1         1492
+
+$ NETWORK_DELAY_MS=50 python measure.py 20 0.5
+20 events, one every 500 ms, network delay 50 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20    53.1   108.3        20        5143      3598
+SSE                  20    52.5   108.1         0        2443         0
+WebSocket            20    52.2   107.9         0        1785         0
+
+$ NETWORK_DELAY_MS=50 python measure.py 20 0.02
+20 events, one every 20 ms, network delay 50 ms each way
+technique      received  p50 ms  max ms  requests  bytes down  bytes up
+long polling         20   108.1   152.4         6        2684      1080
+SSE                  20    52.4    53.5         0        2448         0
+WebSocket            20    52.3    53.4         0        1788         0

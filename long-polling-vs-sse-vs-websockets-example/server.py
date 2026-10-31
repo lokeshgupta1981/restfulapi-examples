@@ -1,6 +1,6 @@
 """Order tracking server with three push endpoints for the same event log:
 
-  GET  /orders/{order_id}/updates?after=N    long polling (JSON)
+  GET  /orders/{order_id}/updates?after=N    long polling (JSON); add &wait=0 for plain polling
   GET  /orders/{order_id}/stream             server-sent events (text/event-stream)
   WS   /orders/{order_id}/socket?after=N     WebSocket (JSON text frames)
 
@@ -95,8 +95,12 @@ async def drop_connections() -> Response:
 
 # 1. Long polling ---------------------------------------------------------
 @app.get("/orders/{order_id}/updates")
-async def long_poll(order_id: str, after: int = Query(0, ge=0)) -> JSONResponse:
-    deadline = time.monotonic() + LONG_POLL_WAIT
+async def long_poll(
+    order_id: str,
+    after: int = Query(0, ge=0),
+    wait: float = Query(LONG_POLL_WAIT, ge=0, le=LONG_POLL_WAIT),   # wait=0 is plain polling
+) -> JSONResponse:
+    deadline = time.monotonic() + wait
     while True:
         seen = log.version()
         events = log.after(order_id, after)
