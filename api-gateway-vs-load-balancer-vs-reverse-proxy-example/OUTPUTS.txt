@@ -1,0 +1,124 @@
+Output of one run of demo.sh on 2026-10-31 (Linux, Python 3.13.18, nginx 1.24.0, curl 8.5.0).
+Run with non-default ports because other servers used the defaults on this machine:
+RP_PORT=20710 RP_TLS_PORT=20711 LB_PORT=20712 GW_PORT=20713 EDGE_PORT=20714 BOOKS1_PORT=20715 BOOKS2_PORT=20716 BOOKS3_PORT=20717 ORDERS_PORT=20718 ./demo.sh
+
+
+===== 1. Direct call to books-1, no proxy
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:45:40 GMT
+server: uvicorn
+content-length: 51
+content-type: application/json
+x-instance: books-1
+
+{"id":"1","title":"RESTful Web APIs","price":39.99}
+{"instance":"books-1","path":"/whoami","tcp_peer":"127.0.0.2","host":"127.0.0.1:20715","x_forwarded_for":null,"x_forwarded_proto":null,"x_client_id":null,"x_api_key":null}
+
+===== 2. The same call through the reverse proxy
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sat, 31 Oct 2026 06:45:40 GMT
+Content-Type: application/json
+Content-Length: 51
+Connection: keep-alive
+x-instance: books-1
+
+{"id":"1","title":"RESTful Web APIs","price":39.99}
+
+===== 3. HTTPS at the reverse proxy: what books-1 sees
+{"instance":"books-1","path":"/whoami","tcp_peer":"127.0.0.1","host":"127.0.0.1","x_forwarded_for":"127.0.0.2","x_forwarded_proto":"https","x_client_id":null,"x_api_key":null}
+
+===== 4. Load balancer: six requests
+HTTP/1.1 200 OK x-instance: books-1 X-Upstream: 127.0.0.1:20715
+HTTP/1.1 200 OK x-instance: books-2 X-Upstream: 127.0.0.1:20716
+HTTP/1.1 200 OK x-instance: books-3 X-Upstream: 127.0.0.1:20717
+HTTP/1.1 200 OK x-instance: books-1 X-Upstream: 127.0.0.1:20715
+HTTP/1.1 200 OK x-instance: books-2 X-Upstream: 127.0.0.1:20716
+HTTP/1.1 200 OK x-instance: books-3 X-Upstream: 127.0.0.1:20717
+
+===== 5. books-2 stops; six more requests through the load balancer
+HTTP/1.1 200 OK x-instance: books-1 X-Upstream: 127.0.0.1:20715
+HTTP/1.1 200 OK x-instance: books-3 X-Upstream: 127.0.0.1:20716, 127.0.0.1:20717
+HTTP/1.1 200 OK x-instance: books-3 X-Upstream: 127.0.0.1:20717
+HTTP/1.1 200 OK x-instance: books-1 X-Upstream: 127.0.0.1:20715
+HTTP/1.1 200 OK x-instance: books-3 X-Upstream: 127.0.0.1:20717
+HTTP/1.1 200 OK x-instance: books-1 X-Upstream: 127.0.0.1:20715
+--- access.log lines for port 20712:
+20712 "GET /books/1 HTTP/1.1" status=200 upstream=127.0.0.1:20715 upstream_status=200
+20712 "GET /books/1 HTTP/1.1" status=200 upstream=127.0.0.1:20716, 127.0.0.1:20717 upstream_status=502, 200
+20712 "GET /books/1 HTTP/1.1" status=200 upstream=127.0.0.1:20717 upstream_status=200
+20712 "GET /books/1 HTTP/1.1" status=200 upstream=127.0.0.1:20715 upstream_status=200
+20712 "GET /books/1 HTTP/1.1" status=200 upstream=127.0.0.1:20717 upstream_status=200
+20712 "GET /books/1 HTTP/1.1" status=200 upstream=127.0.0.1:20715 upstream_status=200
+--- error.log:
+connect() failed (111: Connection refused) while connecting to upstream, client: 127.0.0.2, server: , request: "GET /books/1 HTTP/1.1", upstream: "http://127.0.0.1:20716/books/1"
+
+===== 6. books-1 stops too: reverse proxy vs load balancer
+reverse proxy:
+502
+load balancer:
+HTTP/1.1 200 OK x-instance: books-3
+
+===== 7. Gateway: no API key
+HTTP/1.1 401 Unauthorized
+Server: nginx
+Date: Sat, 31 Oct 2026 06:45:51 GMT
+Content-Type: application/json
+Content-Length: 39
+Connection: keep-alive
+
+{"error":"missing or unknown API key"}
+
+--- the load balancer does not care:
+200
+
+===== 8. Gateway: valid key, routing by path
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sat, 31 Oct 2026 06:45:51 GMT
+Content-Type: application/json
+Content-Length: 51
+Connection: keep-alive
+x-instance: books-3
+
+{"id":"1","title":"RESTful Web APIs","price":39.99}
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sat, 31 Oct 2026 06:45:52 GMT
+Content-Type: application/json
+Content-Length: 58
+Connection: keep-alive
+x-instance: orders-1
+
+{"id":"1042","bookId":"1","quantity":2,"status":"SHIPPED"}
+HTTP/1.1 404 Not Found
+Server: nginx
+Date: Sat, 31 Oct 2026 06:45:52 GMT
+Content-Type: application/json
+Content-Length: 35
+Connection: keep-alive
+
+{"error":"no route for this path"}
+
+===== 9. Gateway: what the service sees
+{"instance":"books-1","path":"/whoami","tcp_peer":"127.0.0.1","host":"127.0.0.1","x_forwarded_for":"127.0.0.2","x_forwarded_proto":"http","x_client_id":"mobile","x_api_key":null}
+
+===== 10. Gateway: rate limit per client (60/min, burst 2)
+mobile  request 1: 200
+mobile  request 2: 200
+mobile  request 3: 200
+mobile  request 4: 429
+mobile  request 5: 429
+partner request 1: 200
+
+===== 11. Production path: HTTPS edge -> gateway -> books pool
+{"instance":"books-3","path":"/whoami","tcp_peer":"127.0.0.1","host":"127.0.0.1","x_forwarded_for":"127.0.0.2, 127.0.0.1","x_forwarded_proto":"https","x_client_id":"partner","x_api_key":null}
+--- access.log, one line per hop:
+20713 "GET /api/whoami HTTP/1.1" status=200 upstream=127.0.0.1:20717 upstream_status=200
+20714 "GET /api/whoami HTTP/1.1" status=200 upstream=127.0.0.1:20713 upstream_status=200
+
+===== 12. A client sends a fake X-Forwarded-For
+reverse proxy (appends to it):
+{"instance":"books-1","path":"/whoami","tcp_peer":"127.0.0.1","host":"127.0.0.1","x_forwarded_for":"203.0.113.9, 127.0.0.2","x_forwarded_proto":"https","x_client_id":null,"x_api_key":null}
+edge (replaces it):
+{"instance":"books-1","path":"/whoami","tcp_peer":"127.0.0.1","host":"127.0.0.1","x_forwarded_for":"127.0.0.2, 127.0.0.1","x_forwarded_proto":"https","x_client_id":"partner","x_api_key":null}

@@ -1,0 +1,140 @@
+# One nginx process plays three roles on three ports. demo.sh replaces the __PORT__ placeholders.
+worker_processes 1;
+pid logs/nginx.pid;
+error_log logs/error.log warn;
+
+events {
+    worker_connections 64;
+}
+
+http {
+    client_body_temp_path tmp/client_body;
+    proxy_temp_path tmp/proxy;
+    fastcgi_temp_path tmp/fastcgi;
+    uwsgi_temp_path tmp/uwsgi;
+    scgi_temp_path tmp/scgi;
+    server_tokens off;
+
+    log_format hops '$server_port "$request" status=$status '
+                    'upstream=$upstream_addr upstream_status=$upstream_status';
+    access_log logs/access.log hops;
+
+    # ---------------------------------------------------------------
+    # Role 1: reverse proxy in front of ONE server (books-1)
+    # ---------------------------------------------------------------
+    server {
+        listen 127.0.0.1:__RP_PORT__;
+        listen 127.0.0.1:__RP_TLS_PORT__ ssl;
+        ssl_certificate     certs/demo.crt;   # self-signed demo certificate
+        ssl_certificate_key certs/demo.key;
+
+        location / {
+            proxy_pass http://127.0.0.1:__BOOKS1_PORT__;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+
+    # ---------------------------------------------------------------
+    # Role 2: load balancer across three identical copies of books
+    # ---------------------------------------------------------------
+    upstream books_pool {
+        server 127.0.0.1:__BOOKS1_PORT__ max_fails=1 fail_timeout=10s;
+        server 127.0.0.1:__BOOKS2_PORT__ max_fails=1 fail_timeout=10s;
+        server 127.0.0.1:__BOOKS3_PORT__ max_fails=1 fail_timeout=10s;
+    }
+
+    server {
+        listen 127.0.0.1:__LB_PORT__;
+
+        location / {
+            proxy_pass http://books_pool;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            add_header X-Upstream $upstream_addr always;
+        }
+    }
+
+    # ---------------------------------------------------------------
+    # Role 3: a small API gateway for the whole bookstore API
+    # ---------------------------------------------------------------
+    upstream orders_service {
+        server 127.0.0.1:__ORDERS_PORT__;
+    }
+
+    # API key -> client name. These are fake demo keys.
+    map $http_x_api_key $client_id {
+        default                "";
+        "demo-key-mobile-123"  mobile;
+        "demo-key-partner-456" partner;
+    }
+
+    # Keep the scheme the first hop saw, if a trusted edge in front of us sent one.
+    map $http_x_forwarded_proto $original_proto {
+        default $http_x_forwarded_proto;
+        ""      $scheme;
+    }
+
+    # 60 requests per minute per client, with a burst of 2.
+    limit_req_zone $client_id zone=per_client:1m rate=60r/m;
+
+    server {
+        listen 127.0.0.1:__GW_PORT__;
+        default_type application/json;
+
+        # 1. Authentication: no known API key, no entry.
+        if ($client_id = "") {
+            return 401 '{"error":"missing or unknown API key"}\n';
+        }
+
+        # 2. Rate limiting per client, answered with 429 instead of the default 503.
+        limit_req zone=per_client burst=2 nodelay;
+        limit_req_status 429;
+
+        # 3. Headers for the services: who the client is; the key never leaves the gateway.
+        proxy_set_header Host              $host;
+        proxy_set_header X-Client-Id       $client_id;
+        proxy_set_header X-API-Key         "";
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $original_proto;
+
+        # 4. Routing by path: /api/books/... -> books pool, /api/orders/... -> orders.
+        location /api/books {
+            rewrite ^/api(/.*)$ $1 break;
+            proxy_pass http://books_pool;
+        }
+
+        location /api/orders/ {
+            rewrite ^/api(/.*)$ $1 break;
+            proxy_pass http://orders_service;
+        }
+
+        location /api/whoami {
+            rewrite ^/api(/.*)$ $1 break;
+            proxy_pass http://books_pool;
+        }
+
+        location / {
+            return 404 '{"error":"no route for this path"}\n';
+        }
+    }
+
+    # ---------------------------------------------------------------
+    # The production path: an edge that terminates TLS, in front of the gateway
+    # ---------------------------------------------------------------
+    server {
+        listen 127.0.0.1:__EDGE_PORT__ ssl;
+        ssl_certificate     certs/demo.crt;
+        ssl_certificate_key certs/demo.key;
+
+        location / {
+            proxy_pass http://127.0.0.1:__GW_PORT__;
+            proxy_http_version 1.1;
+            proxy_set_header Host              $host;
+            # The edge is the first hop we trust: replace whatever the client sent.
+            proxy_set_header X-Forwarded-For   $remote_addr;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
