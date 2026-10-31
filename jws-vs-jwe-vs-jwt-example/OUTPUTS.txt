@@ -1,0 +1,127 @@
+# Output of one run on Linux, Python 3.13.18, 2026-10-31, 2 vCPUs (Intel Xeon @ 2.80GHz)
+# Keys are generated on the first run, so tokens differ on every machine.
+
+########## python demo.py
+
+== 1. JWS: a signed JWT
+eyJhbGciOiJFUzI1NiIsImtpZCI6ImF1dGgtc2VydmVyLXNpZ25pbmctZGVtbyIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL2FwaS5leGFtcGxlLmNvbS9vcmRlcnMiLCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIiwiZXhwIjoxNzkzNDI5MDE0LCJpYXQiOjE3OTM0Mjg3MTQsImlzcyI6Imh0dHBzOi8vYXV0aC5leGFtcGxlLmNvbSIsInNjb3BlIjoib3JkZXJzOnJlYWQiLCJzdWIiOiJ1c2VyLTQyIn0.z2VhpFTvMtyLXicKWtHPW3ueeyeZwN5qb65J9nGN6njaUwBPR2w7JffzpIn9UySUqkSf5hO8jFhTf-QQfHwPVA
+parts: 3 -> JWS
+header : {"alg":"ES256","kid":"auth-server-signing-demo","typ":"JWT"}
+payload: {"aud":"https://api.example.com/orders","email":"alice@example.com","exp":1793429014,"iat":1793428714,"iss":"https://auth.example.com","scope":"orders:read","sub":"user-42"}
+signature bytes: 64
+
+== 2. JWS: change one claim and verify again
+rejected: InvalidJWSSignature - Verification failed for all signatures["Failed: [InvalidJWSSignature('Verification failed')]"]
+
+== 3. JWE: an encrypted JWT
+eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoib3JkZXJzLWFwaS1lbmNyeXB0aW9uLWRlbW8iLCJ0eXAiOiJKV1QifQ.FMIRU...
+parts: 5 -> JWE
+  protected header         85 bytes
+  encrypted key           256 bytes
+  initialization vector    12 bytes
+  ciphertext              173 bytes
+  authentication tag       16 bytes
+header : {"alg":"RSA-OAEP-256","enc":"A256GCM","kid":"orders-api-encryption-demo","typ":"JWT"}
+ciphertext, first 24 bytes: b"28\x82\x11\xf8\x11\x85\x0e\xbd\x0e\xec\xdb\xdb\xed\xc1\xcek\xa7'\xfd\xd7=\x03\xa5"
+decrypted by the Orders API: {'aud': 'https://api.example.com/orders', 'email': 'alice@example.com', 'exp': 1793429014, 'iat': 1793428714, 'iss': 'https://auth.example.com', 'scope': 'orders:read', 'sub': 'user-42'}
+
+== 4. JWE: change one byte of the ciphertext
+rejected: InvalidJWEData - No recipient matched the provided key['Failed: [InvalidTag()]']
+
+== 5. JWE: anyone with the public key can create one
+decrypt_only() accepted: {'aud': 'https://api.example.com/orders', 'email': 'mallory@example.com', 'exp': 1793429014, 'iat': 1793428714, 'iss': 'https://auth.example.com', 'scope': 'orders:read orders:write', 'sub': 'admin'}
+
+== 6. Nested JWT: signed, then encrypted
+eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwiY3R5IjoiSldUIiwia2lkIjoib3JkZXJzLWFwaS1lbmNyeXB0aW9uLWRlbW8ifQ.CSw7h...
+parts: 5 -> JWE
+outer header: {"alg":"RSA-OAEP-256","enc":"A256GCM","cty":"JWT","kid":"orders-api-encryption-demo"}
+decrypt_and_verify(): {'aud': 'https://api.example.com/orders', 'email': 'alice@example.com', 'exp': 1793429014, 'iat': 1793428714, 'iss': 'https://auth.example.com', 'scope': 'orders:read', 'sub': 'user-42'}
+
+== 7. Nested JWT: the attacker signs with a key of their own
+rejected: InvalidJWSSignature - Verification failed for all signatures["Failed: [InvalidJWSSignature('Verification failed')]"]
+plain forged JWE rejected: ValueError - the encrypted content is not a signed JWT
+
+== 8. Token size
+  JWS (ES256)                      399 characters
+  JWE (RSA-OAEP-256 + A256GCM)     729 characters
+  Nested (JWS inside JWE)         1030 characters
+
+== 9. Time per token on the Orders API side (median of 5 rounds)
+  verify JWS                    219 microseconds (rounds: 207, 219, 265, 206, 231; 2000 tokens each)
+  decrypt JWE                   902 microseconds (rounds: 853, 904, 892, 917, 902; 2000 tokens each)
+  decrypt + verify nested      1215 microseconds (rounds: 1456, 1318, 1215, 1033, 1062; 2000 tokens each)
+
+########## PORT=20370 ./demo.sh
+== JWS on /jws/orders
+$ curl -i http://127.0.0.1:20370/jws/orders -H "Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtp..."
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 110
+content-type: application/json
+
+{"user":"user-42","email":"alice@example.com","scope":"orders:read","orders":[{"id":"ord-1001","total":59.9}]}
+
+
+== JWE on the naive /jwe-only/orders
+$ curl -i http://127.0.0.1:20370/jwe-only/orders -H "Authorization: Bearer eyJhbGciOiJSU0EtT0FFUC0y..."
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 110
+content-type: application/json
+
+{"user":"user-42","email":"alice@example.com","scope":"orders:read","orders":[{"id":"ord-1001","total":59.9}]}
+
+
+== Forged JWE on the naive /jwe-only/orders
+$ curl -i http://127.0.0.1:20370/jwe-only/orders -H "Authorization: Bearer eyJhbGciOiJSU0EtT0FFUC0y..."
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 126
+content-type: application/json
+
+{"user":"admin","email":"mallory@example.com","scope":"orders:read orders:write","orders":[{"id":"ord-0001","total":12999.0}]}
+
+
+== Nested JWT on /orders
+$ curl -i http://127.0.0.1:20370/orders -H "Authorization: Bearer eyJhbGciOiJSU0EtT0FFUC0y..."
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 110
+content-type: application/json
+
+{"user":"user-42","email":"alice@example.com","scope":"orders:read","orders":[{"id":"ord-1001","total":59.9}]}
+
+
+== Forged JWE on /orders
+$ curl -i http://127.0.0.1:20370/orders -H "Authorization: Bearer eyJhbGciOiJSU0EtT0FFUC0y..."
+HTTP/1.1 401 Unauthorized
+server: uvicorn
+www-authenticate: Bearer error="invalid_token"
+content-length: 38
+content-type: application/json
+
+{"detail":"invalid token: ValueError"}
+
+
+== Forged nested JWT (attacker's signing key) on /orders
+$ curl -i http://127.0.0.1:20370/orders -H "Authorization: Bearer eyJhbGciOiJSU0EtT0FFUC0y..."
+HTTP/1.1 401 Unauthorized
+server: uvicorn
+www-authenticate: Bearer error="invalid_token"
+content-length: 47
+content-type: application/json
+
+{"detail":"invalid token: InvalidJWSSignature"}
+
+
+== JWS on /orders (not encrypted)
+$ curl -i http://127.0.0.1:20370/orders -H "Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtp..."
+HTTP/1.1 401 Unauthorized
+server: uvicorn
+www-authenticate: Bearer error="invalid_token"
+content-length: 42
+content-type: application/json
+
+{"detail":"invalid token: InvalidJWEData"}
+
+
