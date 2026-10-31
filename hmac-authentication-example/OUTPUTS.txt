@@ -1,3 +1,9 @@
+## HMAC basics
+quantity 2:  0858fb4acea199eedf974956c9a482b07cb1e2aac4424ddcf056b62abb7b5974
+quantity 3:  ab5dc5b93a6e92dccb9c705b0e7cebb893ba7f19d8f1f3fc071b0ada62543f69
+other key:   eba8a3c6b97257d8959f62a91d31b43d971a1c07f191910aeda232cf0e62a36e
+length: 64 hex characters (32 bytes)
+
 ## Canonical request and signature in Python, Node.js and Java
 POST
 localhost:9410
@@ -10,9 +16,6 @@ signature: 9140e96dca095dfa3f4f13b237c07bb7cb5b116fcbf7c52d69665d12c40d066f
 same value: True
 uppercase hex: False
 first 10 characters: False
-same value: true
-uppercase hex: false
-first 10 characters: false
 POST
 localhost:9410
 /orders
@@ -21,6 +24,9 @@ currency=USD&note=gift%20wrap
 n-0001
 4dcd5916ed3da376b0d971b5bf063a40a8cbc9d70e93a340a0023737b9fa7e48
 signature: 9140e96dca095dfa3f4f13b237c07bb7cb5b116fcbf7c52d69665d12c40d066f
+same value: true
+uppercase hex: false
+first 10 characters: false
 POST
 localhost:9410
 /orders
@@ -34,16 +40,17 @@ match: true
 ## Orders API scenarios
 ## Request without a signature
 HTTP/1.1 401 Unauthorized
-date: Mon, 05 Oct 2026 12:36:14 GMT
+date: Sat, 31 Oct 2026 06:06:31 GMT
 server: uvicorn
 www-authenticate: HMAC-SHA256 realm="orders-api"
 content-length: 111
 content-type: application/problem+json
 
 {"type":"about:blank","title":"Unauthorized","status":401,"detail":"Missing HMAC-SHA256 Authorization header."}
+
 --- 1. valid signed POST
 201 {"id":1001,"item":"keyboard","quantity":2}
-Authorization: HMAC-SHA256 keyId="client-1-2026-10", ts="1791203774", nonce="b4a49a4c9ba770d160875a16", sig="bef53c0ee540ba5c03d15ec6901915ba08ced42c26b97d111593b65a5c9be095"
+Authorization: HMAC-SHA256 keyId="client-1-2026-10", ts="1793426791", nonce="5cf02cb23d2a38922b497e6f", sig="add9ad24769e426a731e52e97a0d033e7e0dde91900a1488dc83176298e30d7f"
 --- 2. replay of request 1 (same nonce and timestamp)
 401 {"type":"about:blank","title":"Unauthorized","status":401,"detail":"Nonce already used."}
 --- 3. body changed after signing
@@ -64,46 +71,46 @@ Authorization: HMAC-SHA256 keyId="client-1-2026-10", ts="1791203774", nonce="b4a
 401 {"type":"about:blank","title":"Unauthorized","status":401,"detail":"Signature does not match."}
 
 ## Server log
-INFO:     Started server process [376]
+INFO:     Started server process [2435]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:9410 (Press CTRL+C to quit)
-INFO:     127.0.0.1:43194 - "GET /docs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:43198 - "POST /orders HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:43206 - "POST /orders?note=gift+wrap&currency=USD HTTP/1.1" 201 Created
-INFO:     127.0.0.1:43212 - "POST /orders?note=gift+wrap&currency=USD HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49158 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49166 - "POST /orders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49168 - "POST /orders?note=gift+wrap&currency=USD HTTP/1.1" 201 Created
+INFO:     127.0.0.1:49176 - "POST /orders?note=gift+wrap&currency=USD HTTP/1.1" 401 Unauthorized
 canonical request on the server:
 POST
 localhost:9410
 /orders
 
-1791203774
-02e5596d3c3245b289d52be0
+1793426791
+1c6f13f78650cebc57f29a46
 ac778ef72003bcdb4d561fbf9d30469d11641af6d8dc325e8758089a0e724243
-INFO:     127.0.0.1:43206 - "POST /orders HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:43212 - "POST /orders HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:43206 - "POST /orders?currency=USD&note=gift%20wrap HTTP/1.1" 201 Created
-INFO:     127.0.0.1:43212 - "GET /orders/1001 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:43206 - "POST /orders HTTP/1.1" 201 Created
-INFO:     127.0.0.1:43212 - "POST /orders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49184 - "POST /orders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49192 - "POST /orders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49204 - "POST /orders?currency=USD&note=gift%20wrap HTTP/1.1" 201 Created
+INFO:     127.0.0.1:49220 - "GET /orders/1001 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49232 - "POST /orders HTTP/1.1" 201 Created
+INFO:     127.0.0.1:49248 - "POST /orders HTTP/1.1" 401 Unauthorized
 canonical request on the server:
 POST
 localhost:9410
 /orders
 
-1791203774
-d667966a768b9896d3eb7cbb
+1793426791
+1785bf77d18509e040fd5b7b
 4dcd5916ed3da376b0d971b5bf063a40a8cbc9d70e93a340a0023737b9fa7e48
-INFO:     127.0.0.1:43206 - "POST /orders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49256 - "POST /orders HTTP/1.1" 401 Unauthorized
 canonical request on the server:
 POST
 localhost:9410
 /buggy/orders
 
-1791203774
-508e61b480741bd7c4cd813f
+1793426791
+363fbddc4b2fcf11da26f853
 1a72a37e3011535ec39b19ba4c33f19c0fd6c2530b765c2870d271f437491a19
-INFO:     127.0.0.1:43212 - "POST /buggy/orders HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:49262 - "POST /buggy/orders HTTP/1.1" 401 Unauthorized
 
 ## RFC 9421 HTTP Message Signatures
 B.2.5 signature: pxcQw6G3AjtMBQjwo8XzkZf/bws5LelbaMk5rGIGtE8=
@@ -125,9 +132,15 @@ library verify: valid, sig1 client-1-2026-10
 tampered body, signature still valid; digest matches body: False
 changed Content-Type: signature rejected (InvalidSignature)
 
-## GitHub webhook test vector and re-serialized JSON
-sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17
-matches: True
+## Webhooks: GitHub test vector, Stripe-style signature, re-serialized JSON
+GitHub: sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17
+matches the GitHub docs: True
+
+Stripe-Signature: t=1793426792,v1=53bebcfb67fdcb65fa59a1589a6b7d8b1e33e8d1ef37c503e49c8de01dc57a51
+fresh event: accepted
+event signed 10 minutes ago: rejected (Timestamp outside the tolerance zone (1793426192))
+re-serialized body: rejected (No signatures found matching the expected signature for payload)
+
 {"item":"keyboard","quantity":2}
 {"item": "keyboard", "quantity": 2}
 same bytes: False

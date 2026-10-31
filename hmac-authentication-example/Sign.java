@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-// Run: java Sign.java  (JDK 21, no dependencies)
+// Run: java Sign.java  (JDK 25, no dependencies)
 public class Sign {
 
   static String encode(String text) {
