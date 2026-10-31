@@ -1,0 +1,8 @@
+{
+  "_comment": "DEMO KEY for the bookstore-bot example only. It is public in this repository, so never trust it anywhere.",
+  "kty": "OKP",
+  "crv": "Ed25519",
+  "x": "90obvVQNyXkTMOgci2NmIJO96ojR7cEA2kHnJdLTVlw",
+  "d": "y6rOfGA5Cs29zRFJPAYA3PYPH32pLsiBBGUZcWRgDfc",
+  "kid": "wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA"
+}

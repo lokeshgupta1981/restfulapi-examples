@@ -1,0 +1,121 @@
+## 1. Test vectors (RFC 9421 B.2.6, Web Bot Auth draft E.2.1)
+== RFC 9421 B.2.6: signing a request using ed25519
+"date": Tue, 20 Apr 2021 02:07:55 GMT
+"@method": POST
+"@path": /foo
+"@authority": example.com
+"content-type": application/json
+"content-length": 18
+"@signature-params": ("date" "@method" "@path" "@authority" "content-type" "content-length");created=1618884473;keyid="test-key-ed25519"
+Signature-Input: sig-b26=("date" "@method" "@path" "@authority" "content-type" "content-length");created=1618884473;keyid="test-key-ed25519"
+Signature: sig-b26=:wqcAqbmYJ2ji2glfAMaRy4gruYYnx2nEFN2HN6jrnDnQCK1u02Gb04v9EDgwUPiu4A0w6vuQv5lIp5WPpBKRCw==:
+matches the RFC: True
+
+== Web Bot Auth draft E.2.1: Signature-Agent present on the request
+JWK thumbprint of the test key: poqkLGiymh_W0uP6PZFw-dvez3QJT5SolqXBCW38r0U
+"@authority": example.com
+"signature-agent";key="sig2": "https://signature-agent.test"
+"@signature-params": ("@authority" "signature-agent";key="sig2");created=1735689600;keyid="poqkLGiymh_W0uP6PZFw-dvez3QJT5SolqXBCW38r0U";alg="ed25519";expires=4889289600;nonce="n9p433xm+NJ3ph3upfBIGmsuwHw387YV7Q/F+6BSpGCVjYCqQw6rznNA8PVVLySrAWsv0hQtFioQb6E1YsauiA==";tag="web-bot-auth"
+Signature: sig2=:CGokAoY/FrPpyuzTe1Fb2kLTAH9Idw6qSFd1+D77r1firsMRCxeuLu5e6O+ek3zQgDMAzjiXtLVfqE00xnABCQ==:
+matches the draft: True
+
+## 2. Verifying ChatGPT agent's signed key directory (snapshot)
+snapshot captured at Sat, 31 Oct 2026 06:42:29 GMT
+status: 200 | content-type: application/http-message-signatures-directory+json
+keys in directory: 1
+1. content-digest matches body: True
+2. kid ArwjqcCqtA5oxEWkzXGC-To_0A9whHmajCHtfe8I9aY equals thumbprint: True
+3. signature sig1: tag=http-message-signatures-directory created=1793428949 expires=1793515349
+   signature base:
+   "@authority";req: chatgpt.com
+   "content-digest": sha-256=:UeAtxIEmvk0OQDLD5IynrW0ZHYBsgvrLcjU8/9Iqw3g=:
+   "@signature-params": ("@authority";req "content-digest");created=1793428949;expires=1793515349;keyid="ArwjqcCqtA5oxEWkzXGC-To_0A9whHmajCHtfe8I9aY";tag="http-message-signatures-directory";alg="ed25519"
+   result: valid
+
+## 3. The bot's key directory
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:46:46 GMT
+server: uvicorn
+content-digest: sha-256=:es/dOlwhEqm0J7Sf7VGhXQ50wymGKK5W+ta+06SJDMs=:
+signature-input: binding=("@authority";req "content-digest");created=1793429207;expires=1793429507;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";tag="http-message-signatures-directory"
+signature: binding=:xBG3hBbP8mF4k8atoPIO3+LBhMRwvNT40VIv49TG/ry8asItfOO/wfsCNv0/yjYJKiccMD/ktoy2PGTy/sFJCQ==:
+cache-control: max-age=300
+content-length: 142
+content-type: application/http-message-signatures-directory+json
+
+{"keys":[{"kty":"OKP","crv":"Ed25519","kid":"wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA","x":"90obvVQNyXkTMOgci2NmIJO96ojR7cEA2kHnJdLTVlw"}]}
+
+## 4. Bookstore API scenarios (bot.py)
+--- 1. unsigned request
+403 {"title":"Bot verification failed","status":403,"detail":"this endpoint is for signed bots only"}
+Accept-Signature: sig1=("@method" "@authority" "@path" "signature-agent";key="sig1");created;expires;tag="web-bot-auth"
+--- 2. signed GET, covering only @authority (the draft's minimum)
+signature base:
+"@authority": 127.0.0.1:20030
+"signature-agent";key="sig1": "http://127.0.0.1:20031/.well-known/http-message-signatures-directory"
+"@signature-params": ("@authority" "signature-agent";key="sig1");created=1793429207;expires=1793429267;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";nonce="r-NfN4f9QA9AhDAKsgXOug";tag="web-bot-auth"
+
+GET /books/1 HTTP/1.1
+Host: 127.0.0.1:20030
+Signature-Agent: sig1="http://127.0.0.1:20031/.well-known/http-message-signatures-directory"
+Signature-Input: sig1=("@authority" "signature-agent";key="sig1");created=1793429207;expires=1793429267;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";nonce="r-NfN4f9QA9AhDAKsgXOug";tag="web-bot-auth"
+Signature: sig1=:2kSPgylgfh/oceMnd7qumkB3uIBMcpmGMSX8Ho/M806PcoZQBbfm6o4e6rafbtzq09NNbUjjEjZw8mrmklyICw==:
+
+200 {"book":{"id":1,"title":"RESTful Web APIs"},"verified_agent":"http://127.0.0.1:20031/.well-known/http-message-signatures-directory"}
+--- 3. same headers replayed on another path
+200 {"book":{"id":2,"title":"HTTP: The Definitive Guide"},"verified_agent":"http://127.0.0.1:20031/.well-known/http-message-signatures-directory"}
+--- 4. same headers replayed on POST /orders
+403 {"title":"Bot verification failed","status":403,"detail":"signature must also cover @method, @path, content-digest"}
+Accept-Signature: sig1=("@method" "@authority" "@path" "signature-agent";key="sig1");created;expires;tag="web-bot-auth"
+--- 5. signed POST covering @method, @path and content-digest
+signature base:
+"@method": POST
+"@authority": 127.0.0.1:20030
+"@path": /orders
+"content-digest": sha-256=:bqmE3+2cosJrjAHEhLHbTv1d52UqRceCD9cdGf7tnd8=:
+"signature-agent";key="sig1": "http://127.0.0.1:20031/.well-known/http-message-signatures-directory"
+"@signature-params": ("@method" "@authority" "@path" "content-digest" "signature-agent";key="sig1");created=1793429207;expires=1793429267;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";nonce="yhMInPp-Y-4ibvsJyG8gZQ";tag="web-bot-auth"
+
+POST /orders HTTP/1.1
+Host: 127.0.0.1:20030
+Signature-Agent: sig1="http://127.0.0.1:20031/.well-known/http-message-signatures-directory"
+Content-Type: application/json
+Content-Digest: sha-256=:bqmE3+2cosJrjAHEhLHbTv1d52UqRceCD9cdGf7tnd8=:
+Signature-Input: sig1=("@method" "@authority" "@path" "content-digest" "signature-agent";key="sig1");created=1793429207;expires=1793429267;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";nonce="yhMInPp-Y-4ibvsJyG8gZQ";tag="web-bot-auth"
+Signature: sig1=:BME4wHoNtFR19aJd7874XProwHlJ4EtW/VvwJDw80Pz7efJWC6/SjcvTzKCbr5fuTZ6SPIb4DGiVZ74inMRSAQ==:
+
+201 {"order":{"id":5001,"bookId":1,"quantity":2},"verified_agent":"http://127.0.0.1:20031/.well-known/http-message-signatures-directory"}
+--- 6. body changed after signing
+403 {"title":"Bot verification failed","status":403,"detail":"invalid: body does not match Content-Digest"}
+--- 7. same request arrives with a different Host (a proxy rewrote it)
+403 {"title":"Bot verification failed","status":403,"detail":"invalid: signature does not match"}
+--- 8. expired signature
+403 {"title":"Bot verification failed","status":403,"detail":"signature expired 540 s ago"}
+--- 9. signature valid for 24 hours
+403 {"title":"Bot verification failed","status":403,"detail":"signature lifetime must be at most 300 s"}
+--- 10. signed with a key that is not in the directory
+403 {"title":"Bot verification failed","status":403,"detail":"unverified: keyid not found in the agent's directory"}
+--- 11. older plain-string Signature-Agent form
+signature base:
+"@authority": 127.0.0.1:20030
+"signature-agent": "http://127.0.0.1:20031/.well-known/http-message-signatures-directory"
+"@signature-params": ("@authority" "signature-agent");created=1793429207;expires=1793429267;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";nonce="YHgEQROKI2Ko2FYkbckx4A";tag="web-bot-auth"
+
+GET /books/1 HTTP/1.1
+Host: 127.0.0.1:20030
+Signature-Agent: "http://127.0.0.1:20031/.well-known/http-message-signatures-directory"
+Signature-Input: sig1=("@authority" "signature-agent");created=1793429207;expires=1793429267;keyid="wLZp4atxtHmoC5Y07G_nwDvXlsvnCGljpMg0lwiw3aA";nonce="YHgEQROKI2Ko2FYkbckx4A";tag="web-bot-auth"
+Signature: sig1=:hC2oaCE2CCIuRcWLsvOYMDQe1K3FVuMZ4b0qihGbbRhKeXJS4bD3jpmvDx6SFMY9XWbnnFrdHhlq8p/6RXt8Dg==:
+
+200 {"book":{"id":1,"title":"RESTful Web APIs"},"verified_agent":"http://127.0.0.1:20031/.well-known/http-message-signatures-directory"}
+
+## 5. Origin log
+[origin] fetched key directory http://127.0.0.1:20031/.well-known/http-message-signatures-directory: 1 key(s)
+
+## 6. Live: Cloudflare Research demo server (needs internet)
+dictionary form (draft -01): HTTP 200, Sat, 31 Oct 2026 06:46:47 GMT
+  Signature-Agent: sig1="https://http-message-signatures-example.research.cloudflare.com"
+  page says: The Signature you sent does not validate against test public key
+plain string form (older drafts): HTTP 200, Sat, 31 Oct 2026 06:46:48 GMT
+  Signature-Agent: "https://http-message-signatures-example.research.cloudflare.com"
+  page says: You successfully authenticated as owning the test public key

@@ -1,0 +1,13 @@
+{
+  "url": "https://chatgpt.com/.well-known/http-message-signatures-directory",
+  "status": 200,
+  "headers": {
+    "date": "Sat, 31 Oct 2026 06:42:29 GMT",
+    "content-type": "application/http-message-signatures-directory+json",
+    "content-digest": "sha-256=:UeAtxIEmvk0OQDLD5IynrW0ZHYBsgvrLcjU8/9Iqw3g=:",
+    "signature-input": "sig1=(\"@authority\";req \"content-digest\");created=1793428949;expires=1793515349;keyid=\"ArwjqcCqtA5oxEWkzXGC-To_0A9whHmajCHtfe8I9aY\";tag=\"http-message-signatures-directory\";alg=\"ed25519\"",
+    "signature": "sig1=:l0R9h+HKnEYPNCL1iA6fUGcradHJKhp5eLJsGNE1+rJEfetBjL+u91iWVYZDCbkpAJMjr50vx6bW/oQYIPeoBQ==:",
+    "cache-control": "no-store, no-transform"
+  },
+  "body": "{\"keys\":[{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"P_1c4SX6fCavDcq6FRegWcVvaOKsp_aXHPEN1FcKDIA\",\"kid\":\"ArwjqcCqtA5oxEWkzXGC-To_0A9whHmajCHtfe8I9aY\",\"use\":\"sig\",\"nbf\":1735689600,\"exp\":1794033749}],\"signature_agent\":\"https://chatgpt.com\",\"purpose\":\"ai\"}"
+}
