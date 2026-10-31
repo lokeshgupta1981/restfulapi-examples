@@ -20,6 +20,9 @@ for i in $(seq 1 40); do
   $PY -c "import time; time.sleep (0.25)"
 done
 
+echo "### curl: HTTP 401 without a challenge"
+curl -si http://127.0.0.1:9420/no-challenge/shipments
+echo
 echo "### curl: no token"
 curl -si http://127.0.0.1:9420/shipments
 echo

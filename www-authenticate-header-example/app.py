@@ -153,6 +153,13 @@ def legacy_reports(request: Request):
     )
 
 
+@app.get("/no-challenge/shipments")
+def no_challenge():
+    # The mistake from section 1 of the article: HTTP 401 without WWW-Authenticate.
+    # Many gateways and hand-written middlewares answer like this.
+    return JSONResponse({"status": 401, "error": "unauthorized"}, status_code=401)
+
+
 bearer_scheme = HTTPBearer()
 
 

@@ -2,7 +2,7 @@ Source code for the article [WWW-Authenticate Header: Challenges and Examples](h
 
 # A Shipments API that sends WWW-Authenticate challenges, and clients that read them
 
-The FastAPI app protects `/shipments` with Bearer tokens and answers every failure with a `WWW-Authenticate` challenge: no error code when no token was sent, `invalid_token`, `insufficient_scope` with `scope`, and `invalid_request`. Each challenge carries a `resource_metadata` URL (RFC 9728). `/v2/shipments` offers two challenges (Bearer and DPoP), `/legacy/reports` sends a Basic challenge, and a tiny forward proxy answers HTTP 407 with `Proxy-Authenticate`.
+`/no-challenge/shipments` shows the common mistake: HTTP 401 without any `WWW-Authenticate` header. The FastAPI app protects `/shipments` with Bearer tokens and answers every failure with a `WWW-Authenticate` challenge: no error code when no token was sent, `invalid_token`, `insufficient_scope` with `scope`, and `invalid_request`. Each challenge carries a `resource_metadata` URL (RFC 9728). `/v2/shipments` offers two challenges (Bearer and DPoP), `/legacy/reports` sends a Basic challenge, and a tiny forward proxy answers HTTP 407 with `Proxy-Authenticate`.
 
 All tokens and passwords in this folder are fake demo values (`demo-token-read`, `demo-token-expired`, `demo-pass-123`, `demo-proxy-pass`).
 
@@ -16,11 +16,11 @@ All tokens and passwords in this folder are fake demo values (`demo-token-read`,
 
 | File | What it does |
 |---|---|
-| app.py | Shipments API on port 9420 (and a copy on port 9423 with `EXPOSE=0`, which does not expose `WWW-Authenticate` to browser scripts) |
+| app.py | Shipments API on port 9420, including `/no-challenge/shipments` (HTTP 401 without a challenge), and a copy on port 9423 with `EXPOSE=0` that does not expose `WWW-Authenticate` to browser scripts |
 | parse-challenges.mjs | Parser for `WWW-Authenticate` and `Proxy-Authenticate` values (RFC 9110 section 11.3) |
 | parse-demo.mjs | Parses the RFC 9110 example value and prints the challenges as JSON |
 | parse-challenges.test.mjs | Tests for the parser, including the RFC 9110 example |
-| client.mjs | Node.js client that reads the challenge, loads the resource metadata and picks the next step |
+| client.mjs | Node.js client that reads the challenge (or notices there is none), loads the resource metadata and picks the next step |
 | basic_client.py | Python requests: repeated header lines, `HTTPBasicAuth` and credentials in the URL |
 | url_credentials.mjs | Shows that `fetch()` rejects a URL with a user name and password |
 | proxy.py | Forward proxy on port 9424 that answers HTTP 407 without `Proxy-Authorization` |

@@ -23,8 +23,12 @@ function nextStep(bearer) {
   return "unknown error code: " + error;
 }
 
+// 0. A 401 without any challenge: the client cannot know what to send.
+let result = await call("GET", "/no-challenge/shipments");
+console.log("  next step:", nextStep(result.bearer));
+
 // 1. No token: the challenge points to the resource metadata.
-let result = await call("GET", "/shipments");
+result = await call("GET", "/shipments");
 console.log("  next step:", nextStep(result.bearer));
 const metadataUrl = result.bearer.params.resource_metadata;
 const metadata = await (await fetch(metadataUrl)).json();
