@@ -1,0 +1,129 @@
+Output of ./run_all.sh on Linux, 2026-10-31 (ISSUER_PORT=20140 API_PORT=20141)
+
+######## anatomy.py
+== Token
+eyJhbGciOiJIUzI1NiIsImtpZCI6ImhzLWRlbW8tMSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJjdXN0b21lciIsImlhdCI6MTc5MzM1MDgwMCwiZXhwIjoxNzkzMzUxMTAwfQ.nqez-Bk-mFvv3RgSxGxX_ogDmLtiDIQgPqgYliqkKQo
+
+== The three parts
+header   : {"alg":"HS256","kid":"hs-demo-1","typ":"JWT"}
+payload  : {"sub":"alice","role":"customer","iat":1793350800,"exp":1793351100}
+signature: nqez-Bk-mFvv3RgSxGxX_ogDmLtiDIQgPqgYliqkKQo (32 bytes)
+
+== Verify by hand: HMAC-SHA256(secret, header + '.' + payload)
+computed : nqez-Bk-mFvv3RgSxGxX_ogDmLtiDIQgPqgYliqkKQo
+matches  : True
+
+== Tamper: change role to admin, keep the old signature
+payload  : {"sub":"alice","role":"admin","iat":1793350800,"exp":1793351100}
+PyJWT    : InvalidSignatureError - Signature verification failed
+
+######## failures.py
+== 1. Correct key, pinned algorithm
+   OK, signature valid
+== 2. No algorithms argument
+   DecodeError - It is required that you pass in a value for the "algorithms" argument when calling decode().
+== 3. Wrong secret
+   InvalidSignatureError - Signature verification failed
+== 4. Secret stored as base64 text, used without decoding
+   InvalidSignatureError - Signature verification failed
+== 5. Public key of a different key pair
+   InvalidSignatureError - Signature verification failed
+== 6. Token is RS256, verifier only allows HS256
+   InvalidAlgorithmError - The specified alg value is not allowed
+== 7. Key type does not match the algorithm (RSA key, ES256 token)
+   TypeError - Expecting a PEM-formatted key.
+== 8. Token cut short by one character during copy and paste
+   DecodeError - Invalid crypto padding
+== 9. Valid signature, but the token expired
+   ExpiredSignatureError - Signature has expired
+== 10a. Signing HS256 with a 6-byte secret
+   warning: InsecureKeyLengthWarning - The HMAC key is 6 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+== 10b. Verifying that token
+   warning: InsecureKeyLengthWarning - The HMAC key is 6 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+   OK, signature valid
+== 11. RSA public key PEM used as an HS256 secret
+   InvalidKeyError - The specified key is an asymmetric key or x509 certificate and should not be used as an HMAC secret.
+
+######## confusion.py
+== real RS256 token
+   naive_verify  : accepted {'sub': 'alice', 'role': 'customer', 'exp': 1793428416}
+   pinned_verify : accepted {'sub': 'alice', 'role': 'customer', 'exp': 1793428416}
+== forged alg=none
+   naive_verify  : accepted {'sub': 'mallory', 'role': 'admin', 'exp': 1793428416}
+   pinned_verify : rejected, InvalidAlgorithmError - The specified alg value is not allowed
+== forged HS256 with public key
+   naive_verify  : accepted {'sub': 'mallory', 'role': 'admin', 'exp': 1793428416}
+   pinned_verify : rejected, InvalidAlgorithmError - The specified alg value is not allowed
+
+######## curl_demo.sh
+== Token request (RS256)
+$ curl -s -X POST http://127.0.0.1:20140/token -H 'Content-Type: application/json' -d '{"sub":"alice","alg":"RS256"}'
+{"access_token":"eyJhbGciOiJSUzI1NiIsImtpZCI6InJzYS0yMDI2MTAzMS0yYWNiNzkiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwOi8vMTI3LjAu
+ ...
+== JWKS
+{'kty': 'RSA', 'key_ops': ['verify'], 'n': '4q9QS3pSpop_9iJuOWS1...', 'e': 'AQAB', 'kid': 'rsa-20261031-2acb79', 'alg': 'RS256', 'use': 'sig'}
+{'kty': 'EC', 'crv': 'P-256', 'x': 'UJb4OxCbvta0OGwoYhjv...', 'y': 'UwaWblOlOG91HEzFyjr5...', 'kid': 'ec-20261031-62dea5', 'alg': 'ES256', 'use': 'sig'}
+== GET /orders with an RS256 token, header {'alg': 'RS256', 'kid': 'rsa-20261031-2acb79', 'typ': 'JWT'}
+HTTP/1.1 200 OK
+{"customer":"alice","orders":[{"id":"ord_1001","total":"49.90"}]}
+== GET /orders with an ES256 token, header {'alg': 'ES256', 'kid': 'ec-20261031-62dea5', 'typ': 'JWT'}
+HTTP/1.1 200 OK
+{"customer":"alice","orders":[{"id":"ord_1001","total":"49.90"}]}
+== GET /orders with an HS256 token, header {'alg': 'HS256', 'kid': 'hs-demo-1', 'typ': 'JWT'}
+HTTP/1.1 200 OK
+{"customer":"alice","orders":[{"id":"ord_1001","total":"49.90"}]}
+== Tampered RS256 token (sub changed to mallory, old signature)
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="InvalidSignatureError: Signature verification failed"
+{"error":"invalid_token","error_description":"InvalidSignatureError: Signature verification failed"}
+== Forged alg=none token
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="PyJWKClientError: Unable to find a signing key that matches: 'None'"
+{"error":"invalid_token","error_description":"PyJWKClientError: Unable to find a signing key that matches: 'None'"}
+== Forged HS256 token signed with the RSA public key (algorithm confusion)
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="InvalidAlgorithmError: The specified alg value is not allowed"
+{"error":"invalid_token","error_description":"InvalidAlgorithmError: The specified alg value is not allowed"}
+== Key rotation
+{"old_kid":"rsa-20261031-2acb79","new_kid":"rsa-20261031-b3857c"}
+-- kids in the JWKS now
+['rsa-20261031-2acb79', 'ec-20261031-62dea5', 'rsa-20261031-b3857c']
+-- old RS256 token, header {'alg': 'RS256', 'kid': 'rsa-20261031-2acb79', 'typ': 'JWT'}
+HTTP/1.1 200 OK
+{"customer":"alice","orders":[{"id":"ord_1001","total":"49.90"}]}
+-- new RS256 token, header {'alg': 'RS256', 'kid': 'rsa-20261031-b3857c', 'typ': 'JWT'}
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="PyJWKClientError: Unable to find a signing key that matches: 'rsa-20261031-b3857c'"
+{"error":"invalid_token","error_description":"PyJWKClientError: Unable to find a signing key that matches: 'rsa-20261031-b3857c'"}
+-- same new token again, 31 seconds later
+HTTP/1.1 200 OK
+{"customer":"alice","orders":[{"id":"ord_1001","total":"49.90"}]}
+
+######## bench.py
+Python 3.13.18, PyJWT 2.15.1, cryptography 50.0.2, x86_64, 2 CPUs, 2000 ops x 5 rounds
+alg    key                    sig bytes token chars same sig twice  sign us verify us
+HS256  256-bit shared secret         32         241           True     21.6      47.7
+RS256  RSA 2048                     256         540           True    782.9      80.2
+PS256  RSA 2048                     256         540          False    922.3     145.5
+ES256  P-256                         64         284          False     84.0     461.7
+EdDSA  Ed25519                       64         284           True    138.9     394.8
+
+######## bench.py, three more runs right after (the machine is shared, so times vary)
+HS256  256-bit shared secret         32         241           True     32.0      58.4
+RS256  RSA 2048                     256         540           True    805.8      85.6
+PS256  RSA 2048                     256         540          False    766.6     112.5
+ES256  P-256                         64         284          False     47.9     135.3
+EdDSA  Ed25519                       64         284           True     48.9     162.6
+
+HS256  256-bit shared secret         32         241           True     19.1      43.7
+RS256  RSA 2048                     256         540           True    781.1      95.2
+PS256  RSA 2048                     256         540          False   1191.5     101.1
+ES256  P-256                         64         284          False     54.5     207.4
+EdDSA  Ed25519                       64         284           True     68.9     191.5
+
+HS256  256-bit shared secret         32         241           True     34.5      90.9
+RS256  RSA 2048                     256         540           True   1400.3     134.4
+PS256  RSA 2048                     256         540          False    916.6      93.1
+ES256  P-256                         64         284          False     57.5     157.4
+EdDSA  Ed25519                       64         284           True     61.1     173.1
+
