@@ -1,0 +1,30 @@
+# Our own style guide: one answer per question, borrowed from the three guides.
+extends:
+  - ./agreed.spectral.yaml
+  - ./google.spectral.yaml
+  - ./zalando.spectral.yaml
+rules:
+  # Versioning: /v1 in the path, like Google (AIP-185).
+  zalando-115-no-url-versioning: off
+  # Naming: camelCase JSON and query parameters, like Google and Azure.
+  zalando-118-snake-case-property-names: off
+  zalando-130-snake-case-query-parameters: off
+  # Paging: pageSize, pageToken, nextPageToken, like Google (AIP-158).
+  zalando-137-conventional-query-parameters: off
+  # Actions: POST .../{id}:verb, like Google (AIP-136) and Azure.
+  zalando-141-verb-free-urls: off
+  # Errors: Problem Details (RFC 9457), like Zalando, instead of google.rpc.Status.
+  aip-193-error-status: off
+  # Paths: kebab-case segments, but we allow Google-style :verb actions at the end.
+  aip-122-collection-ids-camel-case: off
+  zalando-129-kebab-case-path-segments: off
+  house-kebab-case-paths:
+    description: Path segments are kebab-case; an action is written as :verb at the end.
+    message: "Path {{property}} breaks our path style"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^(/([a-z][a-z0-9-]*|\\{[^}/]+\\}))+(:[a-z][a-zA-Z0-9]*)?$"

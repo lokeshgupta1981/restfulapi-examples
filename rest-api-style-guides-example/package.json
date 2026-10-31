@@ -1,0 +1,11 @@
+{
+  "name": "rest-api-style-guides-example",
+  "private": true,
+  "description": "One OpenAPI document linted against small Spectral rulesets for the Microsoft (Azure), Google AIP and Zalando REST API guidelines",
+  "scripts": {
+    "lint:all": "./lint-all.sh"
+  },
+  "devDependencies": {
+    "@stoplight/spectral-cli": "6.17.0"
+  }
+}

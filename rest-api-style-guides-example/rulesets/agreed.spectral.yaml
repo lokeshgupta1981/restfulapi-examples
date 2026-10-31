@@ -1,0 +1,40 @@
+# Two rules that Microsoft (Azure), Google and Zalando all share.
+formats: [oas3]
+rules:
+  all-lists-are-paginated:
+    description: >
+      Azure: YOU SHOULD support paging today (#collections-support-server-driven-paging).
+      Google: collections must provide pagination at the outset (AIP-158).
+      Zalando: MUST support pagination (#159).
+    message: "List operation accepts no paging parameter"
+    severity: error
+    given: $.paths[?(!@property.match(/[}:][^/]*$/))].get
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [parameters]
+          properties:
+            parameters:
+              type: array
+              contains:
+                type: object
+                required: [name]
+                properties:
+                  name:
+                    enum: [pageSize, pageToken, page_size, page_token, top, skip, maxpagesize, cursor, limit, offset]
+
+  all-responses-are-json-objects:
+    description: >
+      Azure: a list response is an object with a top-level array (#collections-response-is-object).
+      Zalando: MUST always return JSON objects as top-level data structures (#110).
+      Google: every response is a protobuf message, which is a JSON object.
+    message: "Response body is not a JSON object"
+    severity: error
+    given: $.paths[*][*].responses[*].content[*].schema
+    then:
+      field: type
+      function: enumeration
+      functionOptions:
+        values: [object]

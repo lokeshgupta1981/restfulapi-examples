@@ -1,0 +1,117 @@
+# A few rules from Google's API Improvement Proposals (AIPs):
+# https://google.aip.dev/
+# Google designs APIs in Protocol Buffers; these rules check the HTTP/JSON
+# form that clients see. This is a teaching subset, not Google's api-linter.
+formats: [oas3]
+rules:
+  aip-185-major-version-in-path:
+    description: The major version is the first part of the URI path (v1, v1beta1).
+    documentationUrl: https://google.aip.dev/185
+    message: "Path {{property}} does not start with a major version such as /v1"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^/v[0-9]+((alpha|beta)[0-9]*)?/"
+
+  aip-122-collection-ids-camel-case:
+    description: Collection identifiers must be in camelCase.
+    documentationUrl: https://google.aip.dev/122
+    message: "Path {{property}} has a collection segment that is not camelCase"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^/v[0-9a-z]+(/([a-z][a-zA-Z0-9]*|\\{[^}/]+\\}))*(:[a-z][a-zA-Z0-9]*)?$"
+
+  aip-136-custom-method-colon:
+    description: A custom method uses a colon before the verb, as in /v1/orders/{orderId}:cancel.
+    documentationUrl: https://google.aip.dev/136
+    message: "Path {{property}} ends in a verb segment; a custom method is written as :verb"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        notMatch: "/(cancel|archive|approve|activate|ship|refund)$"
+
+  aip-158-list-must-paginate:
+    description: Methods returning collections must provide pagination with pageSize and pageToken.
+    documentationUrl: https://google.aip.dev/158
+    message: "List operation has no pageSize/pageToken query parameters"
+    severity: error
+    given: $.paths[?(!@property.match(/[}:][^/]*$/))].get
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [parameters]
+          properties:
+            parameters:
+              type: array
+              allOf:
+                - contains: { type: object, properties: { name: { const: pageSize } }, required: [name] }
+                - contains: { type: object, properties: { name: { const: pageToken } }, required: [name] }
+
+  aip-158-next-page-token:
+    description: List responses carry a nextPageToken; it is empty on the last page.
+    documentationUrl: https://google.aip.dev/158
+    message: "List response has no nextPageToken field"
+    severity: error
+    given: $.paths[?(!@property.match(/[}:][^/]*$/))].get.responses.200.content.application/json.schema
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [properties]
+          properties:
+            properties: { type: object, required: [nextPageToken] }
+
+  aip-140-json-lower-camel-case:
+    description: Proto fields are lower_snake_case and appear in JSON as lowerCamelCase.
+    documentationUrl: https://google.aip.dev/140
+    message: "JSON field {{property}} is not lowerCamelCase"
+    severity: error
+    given: $..properties
+    then:
+      field: "@key"
+      function: casing
+      functionOptions:
+        type: camel
+
+  aip-193-error-status:
+    description: Errors are a google.rpc.Status, sent as {"error":{"code":<HTTP status>,"message","status","details"}}.
+    documentationUrl: https://google.aip.dev/193
+    message: "Error schema is not the google.rpc.Status JSON shape: {{error}}"
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^[45]/))].content.application/json.schema
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [properties]
+          properties:
+            properties:
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: object
+                  required: [properties]
+                  properties:
+                    properties:
+                      type: object
+                      required: [code, message, status, details]
+                      properties:
+                        code:
+                          type: object
+                          properties: { type: { const: integer } }
+                          required: [type]

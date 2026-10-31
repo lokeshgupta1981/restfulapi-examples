@@ -1,0 +1,146 @@
+### PORT=29860 ./demo.sh  (Python 3.13.18, FastAPI 0.143.0, uvicorn 0.54.0)
+== GET /azure/orders?api-version=2026-10-01&maxpagesize=2
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"value":[{"id":"ord-1","customerId":"cus-42","status":"paid","totalAmount":"49.90"},{"id":"ord-2","customerId":"cus-42","status":"pending","totalAmount":"12.00"}],"nextLink":"http://127.0.0.1:29860/azure/orders?api-version=2026-10-01&maxpagesize=2&skipToken=eyJvIjogMn0"}
+
+
+== GET /azure/orders?maxpagesize=2
+HTTP/1.1 400 Bad Request
+x-ms-error-code: MissingApiVersionParameter
+content-type: application/json
+
+{"error":{"code":"MissingApiVersionParameter","message":"The api-version query parameter (?api-version=) is required for all requests"}}
+
+
+== GET /azure/orders/ord-9?api-version=2026-10-01
+HTTP/1.1 404 Not Found
+x-ms-error-code: OrderNotFound
+content-type: application/json
+
+{"error":{"code":"OrderNotFound","message":"Order 'ord-9' does not exist."}}
+
+
+== GET /google/v1/orders?pageSize=2
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"orders":[{"name":"orders/ord-1","customerId":"cus-42","status":"PAID","totalAmount":"49.90"},{"name":"orders/ord-2","customerId":"cus-42","status":"PENDING","totalAmount":"12.00"}],"nextPageToken":"eyJvIjogMn0"}
+
+
+== GET /google/v1/orders/ord-9
+HTTP/1.1 404 Not Found
+content-type: application/json
+
+{"error":{"code":404,"message":"Order 'orders/ord-9' not found.","status":"NOT_FOUND","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"ORDER_NOT_FOUND","domain":"orders.example.com","metadata":{"order":"orders/ord-9"}}]}}
+
+
+== GET /zalando/orders?limit=2
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"self":"http://127.0.0.1:29860/zalando/orders?limit=2","next":"http://127.0.0.1:29860/zalando/orders?limit=2&cursor=eyJvIjogMn0","items":[{"id":"ord-1","customer_id":"cus-42","status":"PAID","total_amount":"49.90"},{"id":"ord-2","customer_id":"cus-42","status":"PENDING","total_amount":"12.00"}]}
+
+
+== GET /zalando/orders/ord-9
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{"type":"https://example.com/problems/order-not-found","title":"Order not found","status":404,"detail":"Order 'ord-9' does not exist."}
+
+
+== GET nextLink (Azure, last page)
+{"value":[{"id":"ord-3","customerId":"cus-7","status":"paid","totalAmount":"80.25"}]}
+
+== GET /google/v1/orders?pageSize=2&pageToken=eyJvIjogMn0 (last page)
+{"orders":[{"name":"orders/ord-3","customerId":"cus-7","status":"PAID","totalAmount":"80.25"}]}
+
+== GET next (Zalando, last page)
+{"self":"http://127.0.0.1:29860/zalando/orders?limit=2&cursor=eyJvIjogMn0","items":[{"id":"ord-3","customer_id":"cus-7","status":"PAID","total_amount":"80.25"}]}
+
+### ./lint-all.sh  (Spectral CLI 6.17.0, Node v22.23.4)
+== spectral lint orders-api.yaml -r rulesets/microsoft.spectral.yaml
+orders-api.yaml:9:14 error ms-versioning-no-version-in-path "Path /v1/orders has a version segment; use the api-version query parameter instead"
+orders-api.yaml:13:18 error ms-versioning-api-version-query-param "Operation has no required api-version query parameter"
+orders-api.yaml:28:10 error ms-versioning-api-version-query-param "Operation has no required api-version query parameter"
+orders-api.yaml:44:24 error ms-versioning-no-version-in-path "Path /v1/orders/{orderId} has a version segment; use the api-version query parameter instead"
+orders-api.yaml:48:18 error ms-versioning-api-version-query-param "Operation has no required api-version query parameter"
+orders-api.yaml:58:31 error ms-versioning-no-version-in-path "Path /v1/orders/{orderId}/cancel has a version segment; use the api-version query parameter instead"
+orders-api.yaml:62:18 error ms-versioning-api-version-query-param "Operation has no required api-version query parameter"
+orders-api.yaml:72:35 error ms-versioning-no-version-in-path "Path /v1/orders/{orderId}/line-items has a version segment; use the api-version query parameter instead"
+orders-api.yaml:76:18 error ms-versioning-api-version-query-param "Operation has no required api-version query parameter"
+orders-api.yaml:85:28 warning ms-collections-response-array-name "List response should have a value array and a nextLink field"
+orders-api.yaml:99:11 error ms-rest-error-code-header "Error response does not declare the x-ms-error-code header"
+orders-api.yaml:120:18 warning ms-collections-response-array-name "List response should have a value array and a nextLink field"
+
+== spectral lint orders-api.yaml -r rulesets/google.spectral.yaml
+orders-api.yaml:58:31 error aip-136-custom-method-colon "Path /v1/orders/{orderId}/cancel ends in a verb segment; a custom method is written as :verb"
+orders-api.yaml:72:35 error aip-122-collection-ids-camel-case "Path /v1/orders/{orderId}/line-items has a collection segment that is not camelCase"
+orders-api.yaml:76:18 error aip-158-list-must-paginate "List operation has no pageSize/pageToken query parameters"
+orders-api.yaml:85:28 error aip-158-next-page-token "List response has no nextPageToken field"
+orders-api.yaml:130:22 error aip-193-error-status "Error schema is not the google.rpc.Status JSON shape: "properties" property must have required property "status""
+
+== spectral lint orders-api.yaml -r rulesets/zalando.spectral.yaml
+orders-api.yaml:9:14 error zalando-115-no-url-versioning "Path /v1/orders has a version segment"
+orders-api.yaml:14:17 error zalando-130-snake-case-query-parameters "Query parameter pageSize is not snake_case"
+orders-api.yaml:14:17 error zalando-137-conventional-query-parameters "Query parameter pageSize is not a conventional paging name; use cursor and limit"
+orders-api.yaml:17:17 error zalando-130-snake-case-query-parameters "Query parameter pageToken is not snake_case"
+orders-api.yaml:17:17 error zalando-137-conventional-query-parameters "Query parameter pageToken is not a conventional paging name; use cursor and limit"
+orders-api.yaml:44:24 error zalando-115-no-url-versioning "Path /v1/orders/{orderId} has a version segment"
+orders-api.yaml:58:31 error zalando-115-no-url-versioning "Path /v1/orders/{orderId}/cancel has a version segment"
+orders-api.yaml:58:31 error zalando-141-verb-free-urls "Path /v1/orders/{orderId}/cancel contains a verb"
+orders-api.yaml:72:35 error zalando-115-no-url-versioning "Path /v1/orders/{orderId}/line-items has a version segment"
+orders-api.yaml:86:29 error zalando-118-snake-case-property-names "Property lineItems is not snake_case"
+orders-api.yaml:101:15 error zalando-176-problem-json "Error response does not offer application/problem+json"
+orders-api.yaml:109:20 error zalando-118-snake-case-property-names "Property customerId is not snake_case"
+orders-api.yaml:111:21 error zalando-118-snake-case-property-names "Property totalAmount is not snake_case"
+orders-api.yaml:112:19 error zalando-118-snake-case-property-names "Property createdAt is not snake_case"
+orders-api.yaml:124:23 error zalando-118-snake-case-property-names "Property nextPageToken is not snake_case"
+
+== spectral lint orders-api.yaml -r rulesets/agreed.spectral.yaml
+orders-api.yaml:76:18 error all-lists-are-paginated "List operation accepts no paging parameter"
+
+== summary for orders-api.yaml
+microsoft  10 errors, 2 warnings
+   2 x ms-collections-response-array-name (warning)
+   1 x ms-rest-error-code-header (error)
+   5 x ms-versioning-api-version-query-param (error)
+   4 x ms-versioning-no-version-in-path (error)
+google     5 errors, 0 warnings
+   1 x aip-122-collection-ids-camel-case (error)
+   1 x aip-136-custom-method-colon (error)
+   1 x aip-158-list-must-paginate (error)
+   1 x aip-158-next-page-token (error)
+   1 x aip-193-error-status (error)
+zalando    15 errors, 0 warnings
+   4 x zalando-115-no-url-versioning (error)
+   5 x zalando-118-snake-case-property-names (error)
+   2 x zalando-130-snake-case-query-parameters (error)
+   2 x zalando-137-conventional-query-parameters (error)
+   1 x zalando-141-verb-free-urls (error)
+   1 x zalando-176-problem-json (error)
+agreed     1 errors, 0 warnings
+   1 x all-lists-are-paginated (error)
+
+== spectral lint orders-api.yaml -r rulesets/house.spectral.yaml
+orders-api.yaml:58:31 error aip-136-custom-method-colon "Path /v1/orders/{orderId}/cancel ends in a verb segment; a custom method is written as :verb"
+orders-api.yaml:76:18 error aip-158-list-must-paginate "List operation has no pageSize/pageToken query parameters"
+orders-api.yaml:76:18 error all-lists-are-paginated "List operation accepts no paging parameter"
+orders-api.yaml:85:28 error aip-158-next-page-token "List response has no nextPageToken field"
+orders-api.yaml:101:15 error zalando-176-problem-json "Error response does not offer application/problem+json"
+exit code: 1
+
+== spectral lint orders-api-house.yaml -r rulesets/house.spectral.yaml
+No results with a severity of 'error' found!
+
+exit code: 0
+
+
+### ./conflict.sh
+camel  microsoft  ok
+camel  google     ok
+camel  zalando    camel.yaml:109:20 error zalando-118-snake-case-property-names "Property customerId is not snake_case"
+snake  microsoft  snake.yaml:109:21 error ms-json-field-name-casing "JSON field customer_id is not camelCase"
+snake  google     snake.yaml:109:21 error aip-140-json-lower-camel-case "JSON field customer_id is not lowerCamelCase"
+snake  zalando    ok

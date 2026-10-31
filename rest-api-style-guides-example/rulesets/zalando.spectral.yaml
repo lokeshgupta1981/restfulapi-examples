@@ -1,0 +1,90 @@
+# A few rules from the Zalando RESTful API and Event Guidelines:
+# https://opensource.zalando.com/restful-api-guidelines/
+# Rule names carry Zalando's rule number. Zalando's own linter is Zally;
+# this is a teaching subset written for Spectral.
+formats: [oas3]
+rules:
+  zalando-115-no-url-versioning:
+    description: MUST not use URL versioning (use media type versioning when versioning is unavoidable).
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#115
+    message: "Path {{property}} has a version segment"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        notMatch: "^/v[0-9]+(/|$)"
+
+  zalando-129-kebab-case-path-segments:
+    description: MUST use kebab-case for path segments (^[a-z][a-z\-0-9]*$).
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#129
+    message: "Path {{property}} has a segment that is not kebab-case"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^(/([a-z][a-z0-9-]*|\\{[^}/]+\\}))+$"
+
+  zalando-141-verb-free-urls:
+    description: MUST keep URLs verb-free.
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#141
+    message: "Path {{property}} contains a verb"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        notMatch: "[/:](cancel|archive|approve|activate|ship|refund)(/|:|$)"
+
+  zalando-130-snake-case-query-parameters:
+    description: MUST use snake_case (never camelCase) for query parameters.
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#130
+    message: "Query parameter {{value}} is not snake_case"
+    severity: error
+    given: $.paths[*][*].parameters[?(@.in == 'query')].name
+    then:
+      function: casing
+      functionOptions:
+        type: snake
+
+  zalando-137-conventional-query-parameters:
+    description: MUST stick to conventional query parameters (cursor, limit, offset for paging).
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#137
+    message: "Query parameter {{value}} is not a conventional paging name; use cursor and limit"
+    severity: error
+    given: $.paths[*][*].parameters[?(@.in == 'query')].name
+    then:
+      function: pattern
+      functionOptions:
+        notMatch: "^(page_?[sS]ize|page_?[tT]oken|top|skip|maxpagesize|per_page)$"
+
+  zalando-118-snake-case-property-names:
+    description: MUST property names must be snake_case (and never camelCase).
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#118
+    message: "Property {{property}} is not snake_case"
+    severity: error
+    given: $..properties
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^[a-z_][a-z_0-9]*$"
+
+  zalando-176-problem-json:
+    description: MUST support problem JSON (RFC 9457, application/problem+json) for 4xx and 5xx responses.
+    documentationUrl: https://opensource.zalando.com/restful-api-guidelines/#176
+    message: "Error response does not offer application/problem+json"
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^[45]/))]
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [content]
+          properties:
+            content: { type: object, required: [application/problem+json] }

@@ -1,0 +1,97 @@
+# A few rules from the Azure REST API Guidelines (Microsoft):
+# https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md
+# Each rule name ends with the anchor of the guideline it checks.
+# This is a teaching subset, not Microsoft's official linter.
+formats: [oas3]
+rules:
+  ms-versioning-no-version-in-path:
+    description: DO NOT include a version number segment in any operation path.
+    documentationUrl: https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#versioning-no-version-in-path
+    message: "Path {{property}} has a version segment; use the api-version query parameter instead"
+    severity: error
+    given: $.paths
+    then:
+      field: "@key"
+      function: pattern
+      functionOptions:
+        notMatch: "^/v[0-9]+(/|$)"
+
+  ms-versioning-api-version-query-param:
+    description: DO use a required query parameter named api-version on every operation.
+    documentationUrl: https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#versioning-api-version-query-param
+    message: "Operation has no required api-version query parameter"
+    severity: error
+    given: $.paths[*][get,put,post,patch,delete]
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [parameters]
+          properties:
+            parameters:
+              type: array
+              contains:
+                type: object
+                required: [name, in, required]
+                properties:
+                  name: { const: api-version }
+                  in: { const: query }
+                  required: { const: true }
+
+  ms-json-field-name-casing:
+    description: DO use camel case for all JSON field names.
+    documentationUrl: https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#json-field-name-casing
+    message: "JSON field {{property}} is not camelCase"
+    severity: error
+    given: $..properties
+    then:
+      field: "@key"
+      function: casing
+      functionOptions:
+        type: camel
+
+  ms-http-query-names-casing:
+    description: DO use camel case for query parameter names (api-version is the documented exception).
+    documentationUrl: https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#http-query-names-casing
+    message: "Query parameter {{value}} is not camelCase"
+    severity: error
+    given: $.paths[*][*].parameters[?(@.in == 'query')].name
+    then:
+      function: pattern
+      functionOptions:
+        match: "^([a-z][a-zA-Z0-9]*|api-version)$"
+
+  ms-collections-response-array-name:
+    description: YOU SHOULD use value as the name of the top-level array field, with a nextLink for the next page.
+    documentationUrl: https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#collections-response-array-name
+    message: "List response should have a value array and a nextLink field"
+    severity: warn
+    given: $.paths[?(!@property.match(/[}:][^/]*$/))].get.responses.200.content.application/json.schema
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [properties]
+          properties:
+            properties:
+              type: object
+              required: [value, nextLink]
+
+  ms-rest-error-code-header:
+    description: DO return an x-ms-error-code response header with a string error code.
+    documentationUrl: https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md#rest-error-code-header
+    message: "Error response does not declare the x-ms-error-code header"
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^[45]/))]
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [headers]
+          properties:
+            headers:
+              type: object
+              required: [x-ms-error-code]
