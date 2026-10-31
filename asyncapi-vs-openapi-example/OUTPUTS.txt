@@ -1,7 +1,7 @@
 ### ./check.sh
 == redocly lint openapi.yaml
 validating openapi.yaml...
-openapi.yaml: validated in 47ms
+openapi.yaml: validated in 86ms
 
 Woohoo! Your API description is valid. 🎉
 
@@ -20,16 +20,17 @@ asyncapi-broken.yaml
 ✖ 2 problems (2 errors, 0 warnings, 0 infos, 0 hints)
 
 
+
 ### ./demo.sh
 == POST /orders
 HTTP/1.1 201 Created
-date: Mon, 05 Oct 2026 04:37:57 GMT
+date: Sat, 31 Oct 2026 06:08:35 GMT
 server: uvicorn
 content-length: 190
 content-type: application/json
-location: /orders/ord_a04ac593
+location: /orders/ord_30462e99
 
-{"id":"ord_a04ac593","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":"49.90","currency":"EUR","status":"pending","createdAt":"2026-10-05T04:37:58Z"}
+{"id":"ord_30462e99","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":"49.90","currency":"EUR","status":"pending","createdAt":"2026-10-31T06:08:35Z"}
 == POST /orders with an empty items array
 HTTP/1.1 422 Unprocessable Content
 content-length: 193
@@ -37,15 +38,25 @@ content-type: application/json
 
 {"detail":[{"type":"too_short","loc":["body","items"],"msg":"List should have at least 1 item after validation, not 0","input":[],"ctx":{"field_type":"List","min_length":1,"actual_length":0}}]}
 
-== payment event for ord_a04ac593
-== GET /orders/ord_a04ac593
-{"id":"ord_a04ac593","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":"49.90","currency":"EUR","status":"paid","createdAt":"2026-10-05T04:37:58Z"}
+== payment event for ord_30462e99
+== GET /orders/ord_30462e99
+{"id":"ord_30462e99","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":"49.90","currency":"EUR","status":"paid","createdAt":"2026-10-31T06:08:35Z"}
 == a bad OrderPlaced event from another producer
 == app log
 [orders] sent orders/placed
-[orders] sent orders/ord_a04ac593/status
+[orders] sent orders/ord_30462e99/status
 == shipping log
 [shipping] listening
 [shipping] valid OrderPlaced on orders/placed
-[shipping] valid OrderStatusChanged on orders/ord_a04ac593/status
+[shipping] valid OrderStatusChanged on orders/ord_30462e99/status
 [shipping] REJECTED orders/placed as OrderPlaced: ["order/status: 'new' is not one of ['pending', 'paid', 'shipped', 'cancelled']", "order/total: 49.9 is not of type 'string'"]
+== raw messages on the broker
+[watch] listening on #
+[watch] orders/placed
+{"eventId": "6621973a-bb24-45cd-831d-8f4bc74b50ef", "occurredAt": "2026-10-31T06:08:35Z", "order": {"id": "ord_30462e99", "customerId": "cus_42", "items": [{"sku": "BOOK-1", "quantity": 2, "unitPrice": "24.95"}], "total": "49.90", "currency": "EUR", "status": "pending", "createdAt": "2026-10-31T06:08:35Z"}}
+[watch] payments/ord_30462e99/completed
+{"paymentId":"pay_7","orderId":"ord_30462e99","amount":"49.90"}
+[watch] orders/ord_30462e99/status
+{"eventId": "34b0b8b3-664b-45ee-9e35-e3c795408b6a", "occurredAt": "2026-10-31T06:08:35Z", "orderId": "ord_30462e99", "status": "paid"}
+[watch] orders/placed
+{"eventId":"3f0c9a2e-5b1d-4c8e-9a7f-2d6e1b0c4a11","occurredAt":"2026-10-05T09:00:00Z","order":{"id":"ord_1a2b3c4d","customerId":"cus_42","items":[{"sku":"BOOK-1","quantity":2,"unitPrice":"24.95"}],"total":49.9,"currency":"EUR","status":"new","createdAt":"2026-10-05T09:00:00Z"}}

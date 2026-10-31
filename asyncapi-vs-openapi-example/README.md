@@ -4,7 +4,7 @@ One Orders service described twice: `openapi.yaml` (OpenAPI 3.1.1) for its REST 
 
 ## Versions
 - Python 3.13, FastAPI 0.142.2, uvicorn 0.54.0, aiomqtt 2.5.1, amqtt 0.12.1 (MQTT 3.1.1 broker), jsonschema 4.26.0, PyYAML 6.0.3
-- Node.js 22, @asyncapi/cli 6.2.0, @redocly/cli 2.57.0
+- Node.js 22, @asyncapi/cli 6.2.2, @redocly/cli 2.72.1
 
 ## Files
 - `openapi.yaml`: POST /orders, GET /orders/{orderId} and an `orderStatusChanged` webhook
@@ -15,6 +15,7 @@ One Orders service described twice: `openapi.yaml` (OpenAPI 3.1.1) for its REST 
 - `shipping.py`: a consumer that checks every message against `asyncapi.yaml`
 - `contract.py`: loads `asyncapi.yaml`, resolves `$ref` and matches topics to channels
 - `publish.py`: sends one MQTT message
+- `watch.py`: prints every message on the broker (topic and raw JSON payload)
 - `broker.yaml`: amqtt broker on port 9211
 
 ## Run
@@ -24,7 +25,7 @@ python3 -m venv .venv
 npm install
 
 ./check.sh   # lint openapi.yaml, validate asyncapi.yaml and asyncapi-broken.yaml
-./demo.sh    # start broker, API and consumer, send requests and events, stop everything
+./demo.sh    # start broker, API, consumer and watcher, send requests and events, stop everything
 ```
 
 On Windows, run the commands from `demo.sh` one by one in separate terminals.

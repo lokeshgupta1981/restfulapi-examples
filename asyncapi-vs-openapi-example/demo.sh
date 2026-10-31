@@ -9,6 +9,8 @@ BROKER=$!
 sleep 2
 $PY shipping.py > shipping.log 2>&1 &
 SHIPPING=$!
+$PY watch.py > watch.log 2>&1 &
+WATCH=$!
 .venv/bin/uvicorn app:app --port 9210 --log-level warning > app.log 2>&1 &
 API=$!
 sleep 3
@@ -38,6 +40,7 @@ sleep 1
 
 echo "== app log"; cat app.log
 echo "== shipping log"; cat shipping.log
-kill $API $SHIPPING $BROKER 2>/dev/null
+echo "== raw messages on the broker"; cat watch.log
+kill $API $SHIPPING $WATCH $BROKER 2>/dev/null
 wait 2>/dev/null
 rm -f post.txt
