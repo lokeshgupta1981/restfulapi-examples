@@ -42,7 +42,9 @@ run curl -s "$APP/products/KB-101/price?currency=EUR"
 echo "### 3. Arrays and repeated keys"
 run curl -s "$APP/orders?status=paid&status=shipped"
 run curl -s "$APP/orders?status=paid,shipped"
+run curl -s -g "$APP/products?category[]=hardware"
 run curl -s -g "$APP/orders?status[]=paid&limit=2"
+run curl -s "$APP/orders?statuss=paid"
 
 echo "### 4. Encoding"
 run curl -s "$APP/products?q=C++"
@@ -67,21 +69,21 @@ echo "### 6. URL length limits"
 for size in 8150 8170; do
   echo "\$ long_value=\$(head -c $size /dev/zero | tr '\\0' x)"
   long_value=$(head -c "$size" /dev/zero | tr '\0' x)
-  echo "\$ curl -s -o /dev/null -w \"%{http_code}\\n\" \"$PROXY/orders?note=\$long_value\""
-  curl -s -o /dev/null -w "%{http_code}\n" "$PROXY/orders?note=$long_value"
+  echo "\$ curl -s -o /dev/null -w \"%{http_code}\\n\" \"$PROXY/products?note=\$long_value\""
+  curl -s -o /dev/null -w "%{http_code}\n" "$PROXY/products?note=$long_value"
   echo
 done
 echo "\$ # the same 8170-character value sent to uvicorn without nginx"
-echo "\$ curl -s -o /dev/null -w \"%{http_code}\\n\" \"$APP/orders?note=\$long_value\""
-curl -s -o /dev/null -w "%{http_code}\n" "$APP/orders?note=$long_value"
+echo "\$ curl -s -o /dev/null -w \"%{http_code}\\n\" \"$APP/products?note=\$long_value\""
+curl -s -o /dev/null -w "%{http_code}\n" "$APP/products?note=$long_value"
 echo
-echo "\$ curl -s \"$PROXY/orders?note=\$long_value\" | head -4"
-curl -s "$PROXY/orders?note=$long_value" | head -4
+echo "\$ curl -s \"$PROXY/products?note=\$long_value\" | head -4"
+curl -s "$PROXY/products?note=$long_value" | head -4
 echo
 
 echo "### 7. Secrets in the query string end up in logs"
-run curl -s -o /dev/null "$PROXY/orders?api_key=demo-key-123&status=paid"
-run curl -s -o /dev/null -H "Authorization: Bearer demo-key-123" "$PROXY/orders?status=paid"
+run curl -s -o /dev/null "$PROXY/products?api_key=demo-key-123&category=books"
+run curl -s -o /dev/null -H "Authorization: Bearer demo-key-123" "$PROXY/products?category=books"
 echo "\$ tail -2 nginx/access.log"
 tail -2 nginx/access.log
 echo
@@ -102,3 +104,6 @@ run node encoding_demo.mjs
 
 echo "### 10. URL length limit of a plain Node.js server"
 run node node_url_limit.mjs
+
+echo "### 11. Letting httpx build the query string"
+run python3 client.py

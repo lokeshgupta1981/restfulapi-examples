@@ -1,22 +1,24 @@
 Source code for the article [Path vs Query Parameters in REST APIs](https://restfulapi.net/path-vs-query-parameters/)
 
-A small Orders and Products API in FastAPI. It shows path parameters that identify a resource, query parameters that filter, sort, page and shape the response, defaults, HTTP 404 versus HTTP 422 for bad values, repeated query keys, percent-encoding cases, an nginx cache keyed on the query string, the nginx URL length limit and the HTTP QUERY method.
+A small Orders and Products API in FastAPI. It shows path parameters that identify a resource, query parameters that filter, sort, page and shape the response, defaults, HTTP 404 versus HTTP 422 for bad values, repeated query keys, rejecting unknown query parameters with a query parameter model, percent-encoding cases, an nginx cache keyed on the query string, the nginx URL length limit, an API key leaking into the access log and the HTTP QUERY method.
 
 ## Versions
 
 - Python 3.13
 - fastapi 0.142.2 (pulls in starlette 1.7.0 and pydantic 2.13.5)
 - uvicorn 0.54.0 (h11 0.16.0)
+- httpx 0.28.1 (only for `client.py`)
 - nginx 1.24.0 (only for the cache, length limit and access log demos)
 - Node.js 22 (only for `encoding_demo.mjs` and `node_url_limit.mjs`)
 - curl 8.5.0
 
 ## Files
 
-- `app.py`: the API.
+- `app.py`: the API. `GET /orders` reads its query parameters from a Pydantic model that forbids unknown names; `GET /products` uses plain arguments and ignores unknown names.
 - `nginx/nginx.conf`: reverse proxy on port 8481 with a small cache. The directives `large_client_header_buffers` and `proxy_cache_key` keep their defaults.
 - `run_demo.sh`: sends every request from the article.
 - `encoding_demo.py`, `encoding_demo.mjs`: how Python and JavaScript encode query strings and path segments.
+- `client.py`: calls the API with httpx and lets it encode the query string.
 - `node_url_limit.mjs`: sends long URLs to a plain Node.js server to show its default header size limit (port 8482).
 - `OUTPUTS.txt`: output of `run_demo.sh` from a real run.
 

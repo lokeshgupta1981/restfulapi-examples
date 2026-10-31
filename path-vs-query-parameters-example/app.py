@@ -44,18 +44,24 @@ def sort_orders(orders: list[dict], sort: str) -> list[dict]:
     return sorted(orders, key=lambda order: order[field], reverse=sort.startswith("-"))
 
 
+class OrderFilters(BaseModel):
+    """Query parameters of GET /orders. Unknown names are rejected with HTTP 422."""
+    model_config = {"extra": "forbid"}
+
+    status: list[Status] | None = None
+    sort: SortKey = "-created"
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
 # Collection: every parameter is optional and shapes the same /orders resource.
 @app.get("/orders")
-def list_orders(
-    status: Annotated[list[Status] | None, Query()] = None,
-    sort: SortKey = "-created",
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    offset: Annotated[int, Query(ge=0)] = 0,
-):
-    matches = [order for order in ORDERS if status is None or order["status"] in status]
-    page = sort_orders(matches, sort)[offset:offset + limit]
-    return {"status": status, "sort": sort, "limit": limit, "offset": offset,
-            "data": [summary(order) for order in page]}
+def list_orders(filters: Annotated[OrderFilters, Query()]):
+    matches = [order for order in ORDERS
+               if filters.status is None or order["status"] in filters.status]
+    page = sort_orders(matches, filters.sort)[filters.offset:filters.offset + filters.limit]
+    return {"status": filters.status, "sort": filters.sort, "limit": filters.limit,
+            "offset": filters.offset, "data": [summary(order) for order in page]}
 
 
 # One resource: the path identifies it, the query only changes what we get back.
@@ -80,6 +86,7 @@ def list_customer_orders(customer_id: Annotated[int, Path(ge=1)]):
 
 
 # Search on the collection: q is echoed back so we can see how the server decoded it.
+# Plain query arguments: FastAPI ignores any query parameter it does not know.
 @app.get("/products")
 def list_products(
     response: Response,

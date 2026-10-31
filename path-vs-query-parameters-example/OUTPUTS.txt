@@ -14,7 +14,7 @@ $ curl -s "http://localhost:8480/orders?status=paid&sort=total&limit=1"
 ### 2. Missing and invalid values
 $ curl -s -i http://localhost:8480/orders/9999
 HTTP/1.1 404 Not Found
-date: Sun, 04 Oct 2026 19:18:02 GMT
+date: Sat, 31 Oct 2026 06:07:36 GMT
 server: uvicorn
 content-length: 33
 content-type: application/json
@@ -23,7 +23,7 @@ content-type: application/json
 
 $ curl -s -i http://localhost:8480/customers/42/orders
 HTTP/1.1 404 Not Found
-date: Sun, 04 Oct 2026 19:18:02 GMT
+date: Sat, 31 Oct 2026 06:07:36 GMT
 server: uvicorn
 content-length: 34
 content-type: application/json
@@ -44,7 +44,7 @@ $ curl -s http://localhost:8480/orders
 
 $ curl -s -i "http://localhost:8480/orders?limit=500"
 HTTP/1.1 422 Unprocessable Content
-date: Sun, 04 Oct 2026 19:18:02 GMT
+date: Sat, 31 Oct 2026 06:07:37 GMT
 server: uvicorn
 content-length: 144
 content-type: application/json
@@ -64,8 +64,14 @@ $ curl -s "http://localhost:8480/orders?status=paid&status=shipped"
 $ curl -s "http://localhost:8480/orders?status=paid,shipped"
 {"detail":[{"type":"literal_error","loc":["query","status",0],"msg":"Input should be 'pending', 'paid', 'shipped' or 'cancelled'","input":"paid,shipped","ctx":{"expected":"'pending', 'paid', 'shipped' or 'cancelled'"}}]}
 
+$ curl -s -g "http://localhost:8480/products?category[]=hardware"
+{"q":null,"category":null,"data":[{"sku":"KB-101","name":"C++ Primer","category":"books","price_usd":49.0},{"sku":"KB-102","name":"Rust in Action","category":"books","price_usd":39.0},{"sku":"HW-201","name":"USB-C Hub","category":"hardware","price_usd":25.0},{"sku":"HW-202","name":"AT&T Modem","category":"hardware","price_usd":80.0}]}
+
 $ curl -s -g "http://localhost:8480/orders?status[]=paid&limit=2"
-{"status":null,"sort":"-created","limit":2,"offset":0,"data":[{"id":1004,"customer_id":8,"status":"paid","total":25.0,"created":"2026-10-04"},{"id":1003,"customer_id":7,"status":"pending","total":80.0,"created":"2026-10-03"}]}
+{"detail":[{"type":"extra_forbidden","loc":["query","status[]"],"msg":"Extra inputs are not permitted","input":"paid"}]}
+
+$ curl -s "http://localhost:8480/orders?statuss=paid"
+{"detail":[{"type":"extra_forbidden","loc":["query","statuss"],"msg":"Extra inputs are not permitted","input":"paid"}]}
 
 ### 4. Encoding
 $ curl -s "http://localhost:8480/products?q=C++"
@@ -110,38 +116,38 @@ X-Cache-Status: MISS
 
 ### 6. URL length limits
 $ long_value=$(head -c 8150 /dev/zero | tr '\0' x)
-$ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8481/orders?note=$long_value"
+$ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8481/products?note=$long_value"
 200
 
 $ long_value=$(head -c 8170 /dev/zero | tr '\0' x)
-$ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8481/orders?note=$long_value"
+$ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8481/products?note=$long_value"
 414
 
 $ # the same 8170-character value sent to uvicorn without nginx
-$ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8480/orders?note=$long_value"
+$ curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8480/products?note=$long_value"
 200
 
-$ curl -s "http://localhost:8481/orders?note=$long_value" | head -4
+$ curl -s "http://localhost:8481/products?note=$long_value" | head -4
 <html>
 <head><title>414 Request-URI Too Large</title></head>
 <body>
 <center><h1>414 Request-URI Too Large</h1></center>
 
 ### 7. Secrets in the query string end up in logs
-$ curl -s -o /dev/null "http://localhost:8481/orders?api_key=demo-key-123&status=paid"
+$ curl -s -o /dev/null "http://localhost:8481/products?api_key=demo-key-123&category=books"
 
 
-$ curl -s -o /dev/null -H "Authorization: Bearer demo-key-123" "http://localhost:8481/orders?status=paid"
+$ curl -s -o /dev/null -H "Authorization: Bearer demo-key-123" "http://localhost:8481/products?category=books"
 
 
 $ tail -2 nginx/access.log
-127.0.0.1 - - [04/Oct/2026:19:18:03 +0000] "GET /orders?api_key=demo-key-123&status=paid HTTP/1.1" 200 228 "-" "curl/8.5.0"
-127.0.0.1 - - [04/Oct/2026:19:18:03 +0000] "GET /orders?status=paid HTTP/1.1" 200 228 "-" "curl/8.5.0"
+127.0.0.1 - - [31/Oct/2026:06:07:37 +0000] "GET /products?api_key=demo-key-123&category=books HTTP/1.1" 200 188 "-" "curl/8.5.0"
+127.0.0.1 - - [31/Oct/2026:06:07:37 +0000] "GET /products?category=books HTTP/1.1" 200 188 "-" "curl/8.5.0"
 
 ### 8. HTTP QUERY with a JSON body
 $ curl -s -i -X QUERY http://localhost:8480/orders -H "Content-Type: application/json" -d '{"status": ["paid"], "customer_ids": [7, 8], "limit": 5}'
 HTTP/1.1 200 OK
-date: Sun, 04 Oct 2026 19:18:02 GMT
+date: Sat, 31 Oct 2026 06:07:37 GMT
 server: uvicorn
 content-length: 170
 content-type: application/json
@@ -176,5 +182,15 @@ $ node node_url_limit.mjs
 http.maxHeaderSize: 16384
 query value of 16000 characters: HTTP 200
 query value of 16300 characters: HTTP 431
+
+
+### 11. Letting httpx build the query string
+$ python3 client.py
+http://localhost:8480/products?q=AT%26T
+{'q': 'AT&T', 'category': None, 'data': [{'sku': 'HW-202', 'name': 'AT&T Modem', 'category': 'hardware', 'price_usd': 80.0}]}
+http://localhost:8480/orders?status=paid&status=shipped&limit=2
+[1004, 1002]
+http://localhost:8480/products/KB-101/price?currency=INR
+{'sku': 'KB-101', 'currency': 'INR', 'amount': 4346.3}
 
 
