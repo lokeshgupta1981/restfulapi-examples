@@ -1,0 +1,100 @@
+
+===== 1. Mobile order screen without and with the BFF
+--- Without a BFF: the app calls every service itself
+GET /orders/1001         -> 200,   849 bytes
+GET /books/b-42          -> 200,  1436 bytes
+GET /books/b-77          -> 200,  1422 bytes
+GET /shipments/s-9001    -> 200,   361 bytes
+Total: 4 requests, 4068 bytes of JSON
+
+--- With the mobile BFF: one request
+GET /mobile/v1/order-screen/1001 -> 200, 340 bytes
+{
+  "orderId": "1001",
+  "status": "SHIPPED",
+  "total": "71.67 EUR",
+  "items": [
+    {
+      "title": "RESTful Web APIs in Practice",
+      "thumbnail": "https://img.example.com/b-42/120.jpg",
+      "quantity": 1
+    },
+    {
+      "title": "HTTP Pocket Reference",
+      "thumbnail": "https://img.example.com/b-77/120.jpg",
+      "quantity": 2
+    }
+  ],
+  "delivery": {
+    "carrier": "DHL",
+    "eta": "2026-11-02",
+    "lastEvent": "Arrived"
+  }
+}
+
+===== 2. Browser sign-in through the web BFF
+--- 2a. GET /bff/login
+HTTP/1.1 302 Found
+location: http://127.0.0.1:20480/authorize?response_type=code&client_id=bookstore-web-bff&redirect_uri=http%3A%2F%2F127.0.0.1%3A20485%2Fbff%2Fcallback&state=OA0YIx6OlRlr2SldCQAZ8Q&code_challenge=B50Sj4ZT_f8tKR-oHmt-9ytvwdgRR9OaGzpHystSu6s&code_challenge_method=S256
+set-cookie: __Host-Http-login=OA0YIx6OlRlr2SldCQAZ8Q; HttpOnly; Max-Age=300; Path=/; SameSite=lax; Secure
+--- 2b. the browser follows the redirect to the authorization server
+HTTP/1.1 302 Found
+location: http://127.0.0.1:20485/bff/callback?code=oEYaKnof7r82B6-SJZ7vjw&state=OA0YIx6OlRlr2SldCQAZ8Q
+--- 2c. the browser comes back to the BFF callback
+HTTP/1.1 302 Found
+location: /
+set-cookie: __Host-Http-session=9NhbiS_1NB7Lbl6TFw0kp_Tw5HhHEoyjNXxbx5lrBsY; HttpOnly; Max-Age=28800; Path=/; SameSite=strict; Secure
+set-cookie: __Host-Http-login=""; expires=Sat, 31 Oct 2026 06:55:21 GMT; HttpOnly; Max-Age=0; Path=/; SameSite=lax; Secure
+
+===== 3. The SPA calls the web BFF with the cookie and the X-CSRF header
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:55:21 GMT
+server: uvicorn
+content-length: 876
+content-type: application/json
+
+{"orderId":"1001","status":"SHIPPED","placedAt":"2026-10-28T09:14:00Z","lines":[{"title":"RESTful Web APIs in Practice","authors":["Jane Writer"],"image":"https://img.example.com/b-42/480.jpg","rating":4.6,"quantity":1,"unitPrice":"39.90"},{"title":"HTTP Pocket Reference","authors":["Sam Author"],"image":"https://img.example.com/b-77/480.jpg","rating":4.3,"quantity":2,"unitPrice":"12.50"}],"totals":{"subtotal":"62.40","tax":"4.37","shippingFee":"4.90","total":"71.67","currency":"EUR"},"shipTo":{"name":"Alice Example","street":"Hauptstr. 1","city":"Berlin","postcode":"10115","country":"DE"},"tracking":{"carrier":"DHL","number":"00340434161234567890","events":[{"at":"2026-10-29T16:00:00Z","where":"Frankfurt","what":"Picked up"},{"at":"2026-10-30T07:40:00Z","where":"Leipzig hub","what":"Sorted"},{"at":"2026-10-31T05:10:00Z","where":"Berlin depot","what":"Arrived"}]}}
+--- does the response contain a token? (grep for eyJ, the start of a JWT)
+0
+
+===== 4. CSRF defense and missing session
+--- 4a. cookie but no X-CSRF header (what a cross-site form post would send)
+HTTP/1.1 403 Forbidden
+date: Sat, 31 Oct 2026 06:55:21 GMT
+server: uvicorn
+content-length: 34
+content-type: application/json
+
+{"detail":"missing X-CSRF header"}
+--- 4b. X-CSRF header but no cookie
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:55:21 GMT
+server: uvicorn
+content-length: 26
+content-type: application/json
+
+{"detail":"not signed in"}
+
+===== 5. Token refresh inside the BFF (access token TTL 60 s, refresh 55 s before expiry)
+HTTP 200
+--- logs/web_bff.log:
+web-bff: access token refreshed for alice
+
+===== 6. Shipping service down: the mobile BFF degrades the screen
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:55:30 GMT
+server: uvicorn
+content-length: 345
+content-type: application/json
+
+{"orderId":"1001","status":"SHIPPED","total":"71.67 EUR","items":[{"title":"RESTful Web APIs in Practice","thumbnail":"https://img.example.com/b-42/120.jpg","quantity":1},{"title":"HTTP Pocket Reference","thumbnail":"https://img.example.com/b-77/120.jpg","quantity":2}],"delivery":null,"warnings":["Delivery details are unavailable right now."]}
+
+===== 7. Latency: direct calls vs the BFF (parallel fan-out inside the BFF)
+SIM_DELAY_MS=80, runs=50
+direct from the app (4 requests): median  167.7 ms
+through the mobile BFF (1 request): median  169.3 ms
+
+===== 8. Latency: the same BFF with sequential fan-out
+SIM_DELAY_MS=80, runs=50
+direct from the app (4 requests): median  167.4 ms
+through the mobile BFF (1 request): median  332.3 ms
