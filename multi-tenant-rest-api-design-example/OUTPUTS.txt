@@ -1,0 +1,175 @@
+Output of a real run on 2026-10-31, Python 3.13.18, PostgreSQL 16.15.
+The API was started on an empty database (invoices.db deleted). The port in the run was 20800; the README uses 8000.
+
+########## python tokens.py --decode alice
+{
+  "sub": "alice",
+  "tenant_id": "acme",
+  "aud": "invoices-api",
+  "iat": 1793429409,
+  "exp": 1793433009
+}
+
+########## ./demo.sh
+== 1. Alice lists invoices: only tenant acme ==
+$ curl http://localhost:8000/invoices -H 'Authorization: Bearer $ALICE'
+HTTP/1.1 200 OK
+content-type: application/json
+ratelimit-policy: "tenant";q=5;w=60
+ratelimit: "tenant";r=4;t=60
+{"tenant":"acme","items":[{"id":1001,"customer":"Wayne Hardware","amount_cents":12000},{"id":1003,"customer":"Stark Supplies","amount_cents":4500}]}
+
+== 2. Alice asks for globex's invoice 1002 through the safe route ==
+$ curl http://localhost:8000/invoices/1002 -H 'Authorization: Bearer $ALICE'
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+ratelimit-policy: "tenant";q=5;w=60
+ratelimit: "tenant";r=3;t=60
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Invoice 1002 not found"}
+
+== 3. The same request through the unsafe route (lookup by ID only) ==
+$ curl http://localhost:8000/unsafe/invoices/1002 -H 'Authorization: Bearer $ALICE'
+HTTP/1.1 200 OK
+content-type: application/json
+{"id":1002,"tenant_id":"globex","customer":"Initech","amount_cents":990000}
+
+== 4. Unsafe route that trusts X-Tenant-ID ==
+$ curl http://localhost:8000/unsafe/invoices -H 'Authorization: Bearer $ALICE' -H 'X-Tenant-ID: globex'
+HTTP/1.1 200 OK
+content-type: application/json
+{"tenant":"globex","items":[{"id":1002,"customer":"Initech","amount_cents":990000}]}
+
+== 5. Alice tries to create an invoice for tenant globex ==
+$ curl -X POST http://localhost:8000/invoices -H 'Authorization: Bearer $ALICE' -H 'Content-Type: application/json' -d '{"customer":"Umbrella","amount_cents":500,"tenant_id":"globex"}'
+HTTP/1.1 422 Unprocessable Content
+content-type: application/json
+ratelimit-policy: "tenant";q=5;w=60
+ratelimit: "tenant";r=2;t=60
+{"detail":[{"type":"extra_forbidden","loc":["body","tenant_id"],"msg":"Extra inputs are not permitted","input":"globex"}]}
+
+== 6. Alice creates an invoice: the server sets the tenant ==
+$ curl -X POST http://localhost:8000/invoices -H 'Authorization: Bearer $ALICE' -H 'Content-Type: application/json' -d '{"customer":"Umbrella","amount_cents":500}'
+HTTP/1.1 201 Created
+content-type: application/json
+ratelimit-policy: "tenant";q=5;w=60
+ratelimit: "tenant";r=1;t=60
+{"id":1004,"customer":"Umbrella","amount_cents":500}
+
+== 7. Acme (free plan, 5 per minute) has used 4 requests: one more works, the 6th gets 429 ==
+acme request 5: 200
+$ curl http://localhost:8000/invoices -H 'Authorization: Bearer $ALICE'
+HTTP/1.1 429 Too Many Requests
+retry-after: 60
+ratelimit-policy: "tenant";q=5;w=60
+ratelimit: "tenant";r=0;t=60
+content-type: application/problem+json
+{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"Tenant acme used its 5 requests per minute"}
+
+== 8. Globex is not affected by acme's limit ==
+$ curl http://localhost:8000/invoices -H 'Authorization: Bearer $BOB'
+HTTP/1.1 200 OK
+content-type: application/json
+ratelimit-policy: "tenant";q=20;w=60
+ratelimit: "tenant";r=19;t=60
+{"tenant":"globex","items":[{"id":1002,"customer":"Initech","amount_cents":990000}]}
+
+== 9. No token ==
+$ curl http://localhost:8000/invoices
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="invoices"
+content-type: application/problem+json
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"Missing bearer token"}
+
+########## pytest -v
+test_tenancy.py::test_list_shows_only_own_tenant PASSED                  [ 14%]
+test_tenancy.py::test_other_tenants_invoice_looks_missing PASSED         [ 28%]
+test_tenancy.py::test_owner_can_read_it PASSED                           [ 42%]
+test_tenancy.py::test_body_cannot_choose_the_tenant PASSED               [ 57%]
+test_tenancy.py::test_tampered_token_is_rejected PASSED                  [ 71%]
+test_tenancy.py::test_rate_limit_is_per_tenant PASSED                    [ 85%]
+test_tenancy.py::test_unsafe_route_leaks_across_tenants PASSED           [100%]
+============================== 7 passed in 0.48s ===============================
+
+########## rls/run.sh
+-- Run as the API's role: psql -U app_user -f demo.sql
+\echo '--- 1. A request for tenant acme. The query has no WHERE clause.'
+--- 1. A request for tenant acme. The query has no WHERE clause.
+BEGIN;
+BEGIN
+SELECT set_config('app.tenant_id', 'acme', true);
+ set_config 
+------------
+ acme
+(1 row)
+
+SELECT id, tenant_id, customer FROM invoices ORDER BY id;
+  id  | tenant_id |    customer    
+------+-----------+----------------
+ 1001 | acme      | Wayne Hardware
+ 1003 | acme      | Stark Supplies
+(2 rows)
+
+COMMIT;
+COMMIT
+\echo '--- 2. After the transaction, no tenant is set: no rows.'
+--- 2. After the transaction, no tenant is set: no rows.
+SELECT count(*) FROM invoices;
+ count 
+-------
+     0
+(1 row)
+
+\echo '--- 3. Acme tries to write a row for globex.'
+--- 3. Acme tries to write a row for globex.
+BEGIN;
+BEGIN
+SELECT set_config('app.tenant_id', 'acme', true);
+ set_config 
+------------
+ acme
+(1 row)
+
+INSERT INTO invoices VALUES (1004, 'globex', 'Umbrella', 500);
+psql:demo.sql:15: ERROR:  new row violates row-level security policy for table "invoices"
+ROLLBACK;
+ROLLBACK
+\echo '--- 4. Acme tries to read invoice 1002 (globex) by ID.'
+--- 4. Acme tries to read invoice 1002 (globex) by ID.
+BEGIN;
+BEGIN
+SELECT set_config('app.tenant_id', 'acme', true);
+ set_config 
+------------
+ acme
+(1 row)
+
+SELECT id, tenant_id FROM invoices WHERE id = 1002;
+ id | tenant_id 
+----+-----------
+(0 rows)
+
+COMMIT;
+COMMIT
+\echo '--- 5. The pooling mistake: a session-level setting (is_local = false) ...'
+--- 5. The pooling mistake: a session-level setting (is_local = false) ...
+SELECT set_config('app.tenant_id', 'acme', false);
+ set_config 
+------------
+ acme
+(1 row)
+
+\echo '--- ... and the next request on the same connection forgets to set its tenant.'
+--- ... and the next request on the same connection forgets to set its tenant.
+SELECT id, tenant_id FROM invoices ORDER BY id;
+  id  | tenant_id 
+------+-----------
+ 1001 | acme
+ 1003 | acme
+(2 rows)
+
+--- 6. The superuser bypasses row-level security: it sees every row.
+ rows_seen 
+-----------
+         3
+(1 row)
+
