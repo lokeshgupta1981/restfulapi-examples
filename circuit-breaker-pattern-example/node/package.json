@@ -1,0 +1,12 @@
+{
+  "name": "circuit-breaker-opossum-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The inventory call protected by the opossum circuit breaker",
+  "scripts": {
+    "demo": "node opossum_demo.js"
+  },
+  "dependencies": {
+    "opossum": "10.0.0"
+  }
+}

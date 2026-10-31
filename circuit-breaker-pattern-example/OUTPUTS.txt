@@ -1,0 +1,110 @@
+$ .venv/bin/python -m pytest -v test_breaker.py
+test_breaker.py::test_opens_after_threshold_consecutive_failures PASSED  [ 14%]
+test_breaker.py::test_success_resets_the_failure_count PASSED            [ 28%]
+test_breaker.py::test_open_breaker_rejects_without_calling_the_remote PASSED [ 42%]
+test_breaker.py::test_half_open_success_closes_the_breaker PASSED        [ 57%]
+test_breaker.py::test_half_open_failure_opens_it_again_for_a_full_period PASSED [ 71%]
+test_breaker.py::test_half_open_lets_only_one_trial_call_through PASSED  [ 85%]
+test_breaker.py::test_errors_that_are_not_remote_failures_do_not_count PASSED [100%]
+============================== 7 passed in 0.02s ===============================
+
+$ ./demo.sh
+
+===== 1. Inventory healthy: the breaker is CLOSED and calls go through
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:20:08 GMT
+server: uvicorn
+content-length: 56
+content-type: application/json
+
+{"id":1,"title":"REST API Design Rulebook","in_stock":7}
+{"name":"inventory","state":"CLOSED","consecutive_failures":0,"retry_after_seconds":null}  [200, 0.001407 s]
+
+===== 2. Inventory down: 5 failures open the breaker, then calls are rejected at once
+[inventory mode: down]
+request 1: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"InventoryError"}  [200, 0.004580 s]
+request 2: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"InventoryError"}  [200, 0.004547 s]
+request 3: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"InventoryError"}  [200, 0.004715 s]
+request 4: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"InventoryError"}  [200, 0.003707 s]
+request 5: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"InventoryError"}  [200, 0.003556 s]
+request 6: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"CircuitOpenError"}  [200, 0.001270 s]
+request 7: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"CircuitOpenError"}  [200, 0.001087 s]
+request 8: {"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"CircuitOpenError"}  [200, 0.001277 s]
+inventory API received: {"mode":"down","requests":5}
+{"name":"inventory","state":"OPEN","consecutive_failures":5,"retry_after_seconds":10.0}  [200, 0.001145 s]
+--- store log:
+breaker inventory: CLOSED -> OPEN (5 consecutive failures, last: InventoryError)
+
+===== 3. POST /orders while the breaker is OPEN
+HTTP/1.1 503 Service Unavailable
+date: Sat, 31 Oct 2026 06:20:08 GMT
+server: uvicorn
+retry-after: 10
+content-length: 183
+content-type: application/problem+json
+
+{"type":"https://example.com/problems/inventory-unavailable","title":"Inventory service unavailable","status":503,"detail":"We can't check stock right now. Please try again shortly."}
+
+===== 4. Trial call fails: HALF_OPEN goes back to OPEN
+waiting for the 10 s open period to end...
+{"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"InventoryError"}  [200, 0.017496 s]
+{"name":"inventory","state":"OPEN","consecutive_failures":5,"retry_after_seconds":10.0}  [200, 0.006177 s]
+--- store log:
+breaker inventory: OPEN -> HALF_OPEN (10 s passed, letting one trial call through)
+breaker inventory: HALF_OPEN -> OPEN (trial call failed: InventoryError)
+
+===== 5. Inventory recovers: the trial call succeeds and the breaker closes
+[inventory mode: healthy]
+{"id":1,"title":"REST API Design Rulebook","in_stock":null,"stock_note":"Stock information is temporarily unavailable","reason":"CircuitOpenError"}  [200, 0.001191 s]
+waiting for the 10 s open period to end...
+{"id":1,"title":"REST API Design Rulebook","in_stock":7}  [200, 0.010262 s]
+{"name":"inventory","state":"CLOSED","consecutive_failures":0,"retry_after_seconds":null}  [200, 0.001075 s]
+--- store log:
+breaker inventory: OPEN -> HALF_OPEN (10 s passed, letting one trial call through)
+breaker inventory: HALF_OPEN -> CLOSED (trial call succeeded)
+
+===== 6. Inventory slow (5 s), store timeout 2 s, 50 requests 10 at a time, NO breaker
+[inventory mode: slow]
+requests sent:              50 (10 at a time)
+answered with fallback:     50
+total time:                 10.11 s
+median latency:             2014 ms
+slowest request:            2046 ms
+requests that waited >= 2 s: 50
+calls the inventory API got: 50
+
+===== 7. Same load WITH the breaker (threshold 5, open 10 s)
+requests sent:              50 (10 at a time)
+answered with fallback:     50
+total time:                 4.08 s
+median latency:             24 ms
+slowest request:            2079 ms
+requests that waited >= 2 s: 11
+calls the inventory API got: 11
+--- store log:
+store: breaker=on, timeout=2 s
+breaker inventory: CLOSED -> OPEN (5 consecutive failures, last: ReadTimeout)
+
+===== 8. The same inventory call with the opossum library (Node.js)
+[inventory mode: healthy]
+call 1 -> 7
+[inventory mode: down]
+call 2 -> null (state: closed)
+call 3 -> null (state: closed)
+call 4 -> null (state: closed)
+  event: open
+call 5 -> null (state: open)
+  event: reject (inventory not called)
+call 6 -> null (state: open)
+  event: reject (inventory not called)
+call 7 -> null (state: open)
+  event: reject (inventory not called)
+call 8 -> null (state: open)
+no fallback -> EOPENBREAKER: Breaker is open
+[inventory mode: healthy]
+waiting 5 s...
+  event: halfOpen
+  event: close
+call 9 -> 7
+stats: fires=9 successes=2 failures=4 rejects=3 fallbacks=7
+[inventory mode: healthy]
