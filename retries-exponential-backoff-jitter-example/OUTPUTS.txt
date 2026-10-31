@@ -1,0 +1,96 @@
+===== curl: a 503 without Retry-After, then the same call again
+HTTP/1.1 503 Service Unavailable
+date: Sat, 31 Oct 2026 06:37:49 GMT
+server: uvicorn
+content-length: 44
+content-type: application/problem+json
+
+{"title":"Service Unavailable","status":503}
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:37:49 GMT
+server: uvicorn
+content-length: 43
+content-type: application/json
+
+{"id":2001,"status":"SHIPPED","total":42.5}
+
+===== curl: a 429 with Retry-After
+HTTP/1.1 429 Too Many Requests
+date: Sat, 31 Oct 2026 06:37:49 GMT
+server: uvicorn
+retry-after: 2
+content-length: 42
+content-type: application/problem+json
+
+{"title":"Too Many Requests","status":429}
+
+===== python client.py 503
+  0.00s  attempt 1: 503, waiting 0.26s (backoff)
+  0.27s  attempt 2: 503, waiting 0.23s (backoff)
+  0.50s  attempt 3: 200, done
+200 {"id":1001,"status":"SHIPPED","total":42.5}
+
+===== python client.py 429
+  0.00s  attempt 1: 429, waiting 2.00s (Retry-After)
+  2.00s  attempt 2: 200, done
+200 {"report":"sales","rows":42}
+
+===== python client.py 404
+  0.00s  attempt 1: 404, done
+404 {"title":"Order not found","status":404}
+
+===== python client.py post-naive
+  1.00s  attempt 1: ReadTimeout, waiting 0.11s (backoff)
+  2.12s  attempt 2: ReadTimeout, waiting 0.36s (backoff)
+  3.49s  attempt 3: ReadTimeout, waiting 0.99s (backoff)
+  5.49s  attempt 4: ReadTimeout, waiting 1.91s (backoff)
+  8.40s  attempt 5: ReadTimeout, no attempts left
+raised ReadTimeout
+new orders on the server: 5
+
+===== python client.py post-no-key
+  1.00s  attempt 1: ReadTimeout, not safe to retry
+raised ReadTimeout
+new orders on the server: 1
+
+===== python client.py post
+  1.00s  attempt 1: ReadTimeout, waiting 0.06s (backoff)
+  2.00s  attempt 2: 201, done
+new orders on the server: 1
+201 {"id":5007,"book":"REST in Practice"}
+
+===== python requests_retry.py (urllib3 Retry)
+   105 ms  Starting new HTTP connection (1): 127.0.0.1:8000
+   107 ms  http://127.0.0.1:8000 "GET /orders/1002?fail=3 HTTP/1.1" 503 44
+   108 ms  Incremented Retry for (url='/orders/1002?fail=3'): Retry(total=3, connect=None, read=None, redirect=None, status=None)
+   108 ms  Retry: /orders/1002?fail=3
+   109 ms  http://127.0.0.1:8000 "GET /orders/1002?fail=3 HTTP/1.1" 503 44
+   109 ms  Incremented Retry for (url='/orders/1002?fail=3'): Retry(total=2, connect=None, read=None, redirect=None, status=None)
+  1375 ms  Retry: /orders/1002?fail=3
+  1376 ms  http://127.0.0.1:8000 "GET /orders/1002?fail=3 HTTP/1.1" 503 44
+  1376 ms  Incremented Retry for (url='/orders/1002?fail=3'): Retry(total=1, connect=None, read=None, redirect=None, status=None)
+  3494 ms  Retry: /orders/1002?fail=3
+  3496 ms  http://127.0.0.1:8000 "GET /orders/1002?fail=3 HTTP/1.1" 200 43
+200 {"id":1002,"status":"SHIPPED","total":42.5}
+
+===== node retry.mjs
+0.01s  attempt 1: 503, waiting 0.09s
+0.11s  attempt 2: 503, waiting 0.25s
+200 {"id":1003,"status":"SHIPPED","total":42.5}
+
+===== python test_retry.py
+attempt 1: waits from 0.000 to 0.500 s (limit 0.5 s)
+attempt 2: waits from 0.000 to 1.000 s (limit 1.0 s)
+attempt 3: waits from 0.001 to 2.000 s (limit 2.0 s)
+attempt 4: waits from 0.000 to 4.000 s (limit 4.0 s)
+attempt 5: waits from 0.002 to 7.999 s (limit 8.0 s)
+attempt 11: waits from 0.001 to 8.000 s (limit 8.0 s)
+Retry-After: Sat, 31 Oct 2026 06:38:49 GMT -> 29.4 s
+all checks passed
+
+===== python herd_sim.py
+100 clients, server down 1000 ms, then 10 requests per 100 ms; median of 21 runs
+strategy                   requests all served (ms)  peak per 100 ms after outage
+fixed 100 ms                   1450            2004                            70   clients that gave up: 0
+exponential, no jitter          902           36438                           100   clients that gave up: 0
+exponential, full jitter        603            4245                            17   clients that gave up: 0
