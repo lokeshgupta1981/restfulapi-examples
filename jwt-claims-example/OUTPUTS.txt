@@ -1,0 +1,127 @@
+Captured on Linux, Python 3.13.18, 2026-10-31T06:28Z. Token values, jti and times differ on every run.
+
+### python3 make_tokens.py && python3 decode_token.py tokens/valid.jwt
+wrote 11 tokens to tokens/
+Token length: 850 characters
+Header:  {"alg": "RS256", "kid": "demo-key-1", "typ": "at+jwt"}
+Payload: {
+  "iss": "https://auth.bookstore.example",
+  "sub": "user-4711",
+  "aud": "https://api.bookstore.example/orders",
+  "exp": 1793428388,
+  "nbf": 1793428088,
+  "iat": 1793428088,
+  "jti": "0984de73-ee72-4426-baae-452d5ee7843f",
+  "client_id": "bookstore-web",
+  "scope": "orders:read orders:write",
+  "https://bookstore.example/claims/tenant": "acme-books",
+  "plan": "pro"
+}
+iat 1793428088 = 2026-10-31T06:28:08+00:00
+nbf 1793428088 = 2026-10-31T06:28:08+00:00
+exp 1793428388 = 2026-10-31T06:33:08+00:00
+Signature: 256 bytes
+
+### ./demo.sh
+wrote 11 tokens to tokens/
+== valid: GET /orders
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"tenant":"acme-books","customer":"user-4711","orders":[{"id":"ord-1001","tenant":"acme-books","customer":"user-4711","total":42.5}]}
+
+
+== expired: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="Signature has expired"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"Signature has expired"}
+
+
+== expired-within-leeway: GET /orders
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"tenant":"acme-books","customer":"user-4711","orders":[{"id":"ord-1001","tenant":"acme-books","customer":"user-4711","total":42.5}]}
+
+
+== not-yet-valid: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="The token is not yet valid (nbf)"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"The token is not yet valid (nbf)"}
+
+
+== wrong-audience: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="Audience doesn't match"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"Audience doesn't match"}
+
+
+== audience-list: GET /orders
+HTTP/1.1 200 OK
+content-type: application/json
+
+{"tenant":"acme-books","customer":"user-4711","orders":[{"id":"ord-1001","tenant":"acme-books","customer":"user-4711","total":42.5}]}
+
+
+== wrong-issuer: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="Invalid issuer"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"Invalid issuer"}
+
+
+== no-exp: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="Token is missing the 'exp' claim"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"Token is missing the \"exp\" claim"}
+
+
+== id-token-type: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="typ is not at+jwt"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"typ is not at+jwt"}
+
+
+== forged-signature: GET /orders
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer error="invalid_token", error_description="Signature verification failed"
+content-type: application/json
+
+{"error":"invalid_token","error_description":"Signature verification failed"}
+
+
+== read-only-scope: POST /orders/ord-1001/refund
+HTTP/1.1 403 Forbidden
+www-authenticate: Bearer error="insufficient_scope", error_description="needs orders:refund"
+content-type: application/json
+
+{"error":"insufficient_scope","error_description":"needs orders:refund"}
+
+
+### python3 pitfalls.py
+PyJWT 2.15.1
+1. no exp, plain decode()                            ACCEPTED (sub=user-4711)
+2. no exp, require=['exp']                           REJECTED: MissingRequiredClaimError: Token is missing the "exp" claim
+3. wrong iss, issuer not passed                      ACCEPTED (sub=user-4711)
+4. wrong iss, issuer passed                          REJECTED: InvalidIssuerError: Invalid issuer
+5. token has aud, audience not passed                REJECTED: InvalidAudienceError: Invalid audience
+6. no aud at all, audience not passed                ACCEPTED (sub=user-4711)
+7. no aud at all, require=['aud']                    REJECTED: MissingRequiredClaimError: Token is missing the "aud" claim
+8. sub is a number                                   REJECTED: InvalidSubjectError: Subject must be a string
+9. unknown claim 'admin': true                       ACCEPTED (sub=user-4711)
+
+### python3 size.py
+only what the API checks                   682 characters
+our demo token                             850 characters
+profile + 40 permissions + 20 groups      2284 characters
