@@ -1,0 +1,29 @@
+{
+  "name": "trpc-vs-rest-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "trpc:server": "tsx src/trpc-server.ts",
+    "trpc:client": "tsx src/trpc-client.ts",
+    "rest:server": "tsx src/rest-server.ts",
+    "rest:client": "tsx src/rest-client.ts",
+    "rest:types": "openapi-typescript openapi.yaml -o src/rest-api-types.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:mistakes": "tsc --noEmit -p tsconfig.mistakes.json"
+  },
+  "dependencies": {
+    "@trpc/client": "11.22.1",
+    "@trpc/server": "11.22.1",
+    "express": "5.3.0",
+    "openapi-fetch": "0.17.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "22.19.1",
+    "openapi-typescript": "7.13.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

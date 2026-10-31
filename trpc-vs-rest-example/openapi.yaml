@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: Bookstore REST API
+  version: 1.0.0
+paths:
+  /books:
+    get:
+      operationId: listBooks
+      responses:
+        "200":
+          description: All books
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Book" }
+    post:
+      operationId: createBook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewBook" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400":
+          description: Invalid book
+  /books/{id}:
+    get:
+      operationId: getBook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: One book
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "404":
+          description: Not found
+components:
+  schemas:
+    NewBook:
+      type: object
+      required: [title, author, priceCents]
+      properties:
+        title: { type: string, minLength: 1 }
+        author: { type: string, minLength: 1 }
+        priceCents: { type: integer, minimum: 1 }
+    Book:
+      allOf:
+        - $ref: "#/components/schemas/NewBook"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string }
