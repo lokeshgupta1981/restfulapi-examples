@@ -1,21 +1,29 @@
-# Captured 2026-10-04T19:09:29Z on a clean install (npm ci in an empty folder)
+# Captured 2026-10-31T06:18:15Z on a clean install (npm ci in an empty folder)
 ## npm ci
-added 69 packages in 531ms
+added 66 packages, and audited 67 packages in 971ms
 ## node --version
-v22.22.0
+v22.23.4
 ## jq --version
 jq-1.7
 
 ## ./demo.sh
 ### Token response for orders-app
-{"access_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6ImF0K2p3dCIsImtpZCI6ImRlbW8ta2V5LTEifQ.eyJzY29wZSI6Im9yZGVyczpyZWFkIiwiY2xpZW50X2lkIjoib3JkZXJzLWFwcCIsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6NDAwMCIsInN1YiI6Im9yZGVycy1hcHAiLCJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjMwMDAvb3JkZXJzIiwiaWF0IjoxNzkxMTQwOTUwLCJleHAiOjE3OTExNDEyNTAsImp0aSI6IjlmMWJkZDQwLTI3NmYtNGI0Yy1iYzQ3LTUxZjhhNzU0YjM4NCJ9.XmUBscJmoD8d_vthm4LXZBUFyD6d0HJ-It3ovFw4Nz3-fNOsfM-wH8S6gJV8Uo5WU5sxEKUjkdIOWyuD__ADfssRehMCFHJ7Jf-9JZSsbEafRI4Ij_ePwgcZx2SxMpFwzkTjWj4gkEVVo-7MQ-PjaUrpiuIEJe80UtJjjT04xFNetSVrmcmV-f65xeOX_yGuoCjkaKZaj1gqg6ZxHDlUQrcMld8-8zpusUlLaxzrQwql6cbw0szbhyP8SqkfIqEUmhYrc4VWgY5w7hVeWIOMp9nrPMc87KHmASy7BtFVjg2rEvZ-6obz7lH9FIoMn1iGznKGawk40e37Lf6smATl7A","token_type":"Bearer","expires_in":300,"scope":"orders:read"}
+{"access_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6ImF0K2p3dCIsImtpZCI6ImRlbW8ta2V5LTEifQ.eyJzY29wZSI6Im9yZGVyczpyZWFkIiwiY2xpZW50X2lkIjoib3JkZXJzLWFwcCIsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6NDAwMCIsInN1YiI6Im9yZGVycy1hcHAiLCJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjMwMDAvb3JkZXJzIiwiaWF0IjoxNzkzNDI3NDc2LCJleHAiOjE3OTM0Mjc3NzYsImp0aSI6IjkxMTNhZWQ0LTdmMDgtNDM5Ny1hODIzLWY4M2U5NWU3ZjkxMiJ9.Csrgn0A5LnssoEA3gy3aBdX6tZh8ruCGtu0ODg5u_HIsRnQMiByAs1MBhJaNWEVooaMvFSZ2tHcsIeP18KEonFC01axoTkPsjHs5JXmzHIJz9OaqBd_NettMnNpgD1bZPme1Ri8bN-jkRcSCrO-4-f7Fq-KKZ9fUHT8wZcf2IZPGjdUUuqVmHy8EQbzg8OQC6MtE5lr0vgNQIouTlKKZ_-rUHaTFnVz7XkXL-w2XxvNICb5W2ga_8jXr9YGd9EITnGa3ZN5rcgJ5XrTUkr3aInaJaMtKnJebZjZE5NdX1_KeQRmbiDPJm54nSI1qXI4CwvL4ONTyJjJU6pgxjUm4cg","token_type":"Bearer","expires_in":300,"scope":"orders:read"}
+
+### Request line and headers that curl sends (token cut after 60 characters)
+> GET /orders HTTP/1.1
+> Host: localhost:3000
+> User-Agent: curl/8.5.0
+> Accept: */*
+> Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6ImF0K2p3dCIsImtpZCI6ImRlbW8ta2
+> 
 
 ### 1. No token
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer realm="orders-api"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 84
-Date: Sun, 04 Oct 2026 19:09:10 GMT
+Date: Sat, 31 Oct 2026 06:17:56 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -26,7 +34,7 @@ HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer realm="orders-api"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 103
-Date: Sun, 04 Oct 2026 19:09:10 GMT
+Date: Sat, 31 Oct 2026 06:17:56 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -37,7 +45,7 @@ HTTP/1.1 400 Bad Request
 WWW-Authenticate: Bearer realm="orders-api", error="invalid_request", error_description="Use the format: Authorization: Bearer <token>"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 114
-Date: Sun, 04 Oct 2026 19:09:10 GMT
+Date: Sat, 31 Oct 2026 06:17:56 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -48,7 +56,7 @@ HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer realm="orders-api", error="invalid_token", error_description="The access token is malformed"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 99
-Date: Sun, 04 Oct 2026 19:09:10 GMT
+Date: Sat, 31 Oct 2026 06:17:57 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -59,7 +67,7 @@ HTTP/1.1 400 Bad Request
 WWW-Authenticate: Bearer realm="orders-api", error="invalid_request", error_description="Send the access token in the Authorization header"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 118
-Date: Sun, 04 Oct 2026 19:09:10 GMT
+Date: Sat, 31 Oct 2026 06:17:57 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -70,7 +78,7 @@ HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer realm="orders-api", error="invalid_token", error_description="The access token is not meant for this API"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 112
-Date: Sun, 04 Oct 2026 19:09:11 GMT
+Date: Sat, 31 Oct 2026 06:17:57 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -81,7 +89,7 @@ HTTP/1.1 403 Forbidden
 WWW-Authenticate: Bearer realm="orders-api", error="insufficient_scope", error_description="The access token lacks the required scope", scope="orders:read"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 108
-Date: Sun, 04 Oct 2026 19:09:11 GMT
+Date: Sat, 31 Oct 2026 06:17:57 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -91,7 +99,7 @@ Keep-Alive: timeout=5
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 Content-Length: 174
-Date: Sun, 04 Oct 2026 19:09:11 GMT
+Date: Sat, 31 Oct 2026 06:17:57 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -101,7 +109,7 @@ Keep-Alive: timeout=5
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 Content-Length: 174
-Date: Sun, 04 Oct 2026 19:09:11 GMT
+Date: Sat, 31 Oct 2026 06:17:57 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -112,7 +120,7 @@ HTTP/1.1 401 Unauthorized
 WWW-Authenticate: Bearer realm="orders-api", error="invalid_token", error_description="The access token expired"
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 94
-Date: Sun, 04 Oct 2026 19:09:19 GMT
+Date: Sat, 31 Oct 2026 06:18:05 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -123,7 +131,7 @@ HTTP/1.1 503 Service Unavailable
 Retry-After: 30
 Content-Type: application/problem+json; charset=utf-8
 Content-Length: 127
-Date: Sun, 04 Oct 2026 19:09:20 GMT
+Date: Sat, 31 Oct 2026 06:18:06 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -133,6 +141,18 @@ Keep-Alive: timeout=5
 Orders API listening on http://localhost:3001
 Cannot load the issuer's signing keys: fetch failed
 GET /orders 503 sub=-
+
+### 12. Tampered token (payload changed to sub=admin, original signature kept)
+Forged payload: {"sub":"admin","scope":"orders:read"}
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="orders-api", error="invalid_token", error_description="The signature is not valid"
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 96
+Date: Sat, 31 Oct 2026 06:18:06 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"The signature is not valid"}
 
 ### Decoded header of ORDERS_TOKEN
 {
@@ -147,9 +167,9 @@ GET /orders 503 sub=-
   "iss": "http://localhost:4000",
   "sub": "orders-app",
   "aud": "http://localhost:3000/orders",
-  "iat": 1791140950,
-  "exp": 1791141250,
-  "jti": "ee67f122-757d-4d67-b84d-7c4e76c170ae"
+  "iat": 1793427476,
+  "exp": 1793427776,
+  "jti": "e44d1de0-62f1-429f-b3c5-1b5f3deade72"
 }
 
 ## node client.js
@@ -163,6 +183,7 @@ Second call: 2 orders
 Demo issuer listening on http://localhost:4000
 ## api.js console
 Orders API listening on http://localhost:3000
+GET /orders 200 sub=orders-app
 GET /orders 401 sub=-
 GET /orders 401 sub=-
 GET /orders 400 sub=-
@@ -172,6 +193,7 @@ GET /orders 401 sub=-
 GET /orders 403 sub=-
 GET /orders 200 sub=orders-app
 GET /orders 200 sub=orders-app
+GET /orders 401 sub=-
 GET /orders 401 sub=-
 GET /orders 200 sub=short-lived-app
 GET /orders 401 sub=-

@@ -6,7 +6,7 @@ A small Orders API (Express) that accepts JWT bearer tokens, plus a tiny demo to
 
 - `issuer.js`: demo authorization server on port 4000. It supports the OAuth 2.0 client credentials grant, signs RS256 JWT access tokens (`typ: at+jwt`) and publishes its public key at `/.well-known/jwks.json`. Demo only.
 - `api.js`: Orders API on port 3000. `GET /orders` needs a bearer token with `aud` = `http://localhost:3000/orders` and the scope `orders:read`. It checks the signature, `iss`, `aud`, `exp` and `typ`, and answers with HTTP 400, 401 or 403 plus a `WWW-Authenticate: Bearer ...` challenge (RFC 6750).
-- `demo.sh`: curl calls for the main cases (no token, Basic credentials, malformed header, token that is not a JWT, token in the query string, wrong audience, missing scope, valid token, lowercase scheme, expired token, issuer keys unreachable). Needs curl and jq.
+- `demo.sh`: curl calls for the main cases (the headers curl sends, no token, Basic credentials, malformed header, token that is not a JWT, token in the query string, wrong audience, missing scope, valid token, lowercase scheme, expired token, issuer keys unreachable, tampered token with the original signature). Needs curl and jq.
 - `client.js`: a client that sends the bearer token with `fetch()` and gets a new token once when the API answers HTTP 401 with `error="invalid_token"`.
 
 The API reads the token from the `Authorization` header and rejects `access_token` in the query string. It does not read the form body (RFC 6750, section 2.2), because `GET /orders` has no body.
@@ -15,12 +15,14 @@ When the API cannot load the issuer's keys (issuer down, timeout, bad JWKS respo
 
 ## Versions
 
-- Node.js 22.22.0 (any Node.js 22 or later)
-- express 5.2.1
+- Node.js 22.23.4 (any Node.js 22 or later)
+- express 5.3.0
 - jose 6.2.12
 - curl and jq 1.7 (for `demo.sh`)
 
 ## Run
+
+`OUTPUTS.txt` holds the output of one full run of `demo.sh` and `client.js`.
 
 ```bash
 git clone https://github.com/lokeshgupta1981/restfulapi-examples.git

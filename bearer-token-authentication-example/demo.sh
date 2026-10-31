@@ -25,6 +25,11 @@ SHORT_TOKEN=$(curl -s -u short-lived-app:short-lived-app-secret -d grant_type=cl
   -d scope=orders:read --data-urlencode resource=http://localhost:3000/orders \
   http://localhost:4000/token | jq -r .access_token)
 
+echo "### Request line and headers that curl sends (token cut after 60 characters)"
+curl -s -v -o /dev/null -H "Authorization: Bearer $ORDERS_TOKEN" http://localhost:3000/orders 2>&1 \
+  | grep '^> ' | cut -c1-82
+echo
+
 echo "### 1. No token"
 curl -s -i http://localhost:3000/orders; echo; echo
 
@@ -65,6 +70,15 @@ kill $API_3001_PID
 echo "### api.js on port 3001 console"
 cat api-3001.log; rm -f api-3001.log
 echo
+
+echo "### 12. Tampered token (payload changed to sub=admin, original signature kept)"
+TOKEN_HEADER=$(echo "$ORDERS_TOKEN" | cut -d. -f1)
+TOKEN_SIGNATURE=$(echo "$ORDERS_TOKEN" | cut -d. -f3)
+FORGED_PAYLOAD=$(echo "$ORDERS_TOKEN" | cut -d. -f2 | jq -R 'gsub("-";"+") | gsub("_";"/") | @base64d | fromjson | .sub = "admin"' -c \
+  | jq -Rj '@base64 | gsub("\\+";"-") | gsub("/";"_") | gsub("=";"")')
+FORGED_TOKEN="$TOKEN_HEADER.$FORGED_PAYLOAD.$TOKEN_SIGNATURE"
+echo "Forged payload: $(echo "$FORGED_PAYLOAD" | jq -R 'gsub("-";"+") | gsub("_";"/") | @base64d | fromjson | {sub, scope}' -c)"
+curl -s -i -H "Authorization: Bearer $FORGED_TOKEN" http://localhost:3000/orders; echo; echo
 
 echo "### Decoded header of ORDERS_TOKEN"
 echo "$ORDERS_TOKEN" | cut -d. -f1 | jq -R 'gsub("-";"+") | gsub("_";"/") | @base64d | fromjson'
