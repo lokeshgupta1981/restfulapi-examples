@@ -7,12 +7,12 @@ One OpenAPI document for a small Orders API, plus the tools that use it: a linte
 | Tool | Version |
 |---|---|
 | OpenAPI Specification (document) | 3.1.2 (`openapi.yaml`), 3.2.0 copy in `openapi-3.2.yaml` |
-| Node.js | 22.22.0 |
-| @redocly/cli (lint, docs) | 2.57.0 |
+| Node.js | 22.23.4 |
+| @redocly/cli (lint, docs) | 2.57.0 (renders with Redoc 2.5.4) |
 | @stoplight/prism-cli (mock server) | 5.16.0 |
 | @openapitools/openapi-generator-cli | 2.41.0 (generator JAR 7.25.0, pinned in `openapitools.json`, needs Java 11+) |
 | tsx / typescript | 4.23.15 / 5.9.3 |
-| Python / FastAPI (code-first part) | 3.13 / 0.142.2 |
+| Python / FastAPI / Pydantic (code-first part) | 3.13.18 / 0.142.2 / 2.14.2 |
 
 ## Files
 
@@ -25,7 +25,7 @@ One OpenAPI document for a small Orders API, plus the tools that use it: a linte
 - `run-all.sh`: runs every step below and prints the output.
 - `OUTPUTS.txt`: output of one full run.
 
-## Run
+## How to Run
 
 ```bash
 npm ci
@@ -40,8 +40,9 @@ npx redocly build-docs openapi.yaml --output docs/index.html
 # 3. Start the mock server on http://127.0.0.1:4010 (keep it running)
 npx prism mock openapi.yaml
 
-# 4. In a second terminal, call the mock
+# 4. In a second terminal, call the mock (the mock returns the documented examples, it runs no logic)
 curl -i "http://127.0.0.1:4010/orders?status=pending" -H "Authorization: Bearer demo-token"
+curl -i "http://127.0.0.1:4010/orders?limit=500" -H "Authorization: Bearer demo-token"
 curl -i "http://127.0.0.1:4010/orders/ord_9999" -H "Authorization: Bearer demo-token" -H "Prefer: code=404"
 
 # 5. Generate a TypeScript client and call the mock with it
@@ -57,7 +58,7 @@ cd ..
 npx redocly lint code-first/generated-openapi.json --format=stylish
 ```
 
-Or run everything at once (the mock server is started and stopped by the script, step 6 needs the venv from above):
+Or run everything at once. The script starts and stops Prism itself (port 4010 must be free), also tries the OpenAPI 3.2 copy with openapi-generator and with Prism (`dataValue` examples), and step 6 needs the venv from above:
 
 ```bash
 ./run-all.sh | tee OUTPUTS.txt

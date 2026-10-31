@@ -3,7 +3,11 @@
 # Usage: npm ci && ./run-all.sh | tee OUTPUTS.txt
 set -u
 export NO_COLOR=1
+export REDOCLY_SUPPRESS_UPDATE_NOTICE=true
 AUTH="Authorization: Bearer demo-token"
+
+# npx starts Prism as a child process, so stop it by its command line.
+stop_prism() { pkill -f "node .*prism mock" 2>/dev/null; sleep 1; }
 
 step() { printf '\n========== %s ==========\n' "$1"; }
 
@@ -24,7 +28,6 @@ npx redocly build-docs openapi.yaml --output docs/index.html 2>&1 | tail -2
 
 step "prism mock"
 npx prism mock openapi.yaml > prism.log 2>&1 &
-PRISM_PID=$!
 sleep 8
 cat prism.log
 
@@ -65,7 +68,7 @@ find client -name "*.ts" | sort
 step "run generated client against the mock"
 npx tsx use-client.ts 2>&1
 
-kill "$PRISM_PID" 2>/dev/null; wait "$PRISM_PID" 2>/dev/null
+stop_prism
 
 step "OpenAPI 3.2 copy: redocly lint"
 npx redocly lint openapi-3.2.yaml 2>&1 | tail -3
@@ -73,6 +76,15 @@ npx redocly lint openapi-3.2.yaml 2>&1 | tail -3
 step "OpenAPI 3.2 copy: openapi-generator"
 npx openapi-generator-cli generate -i openapi-3.2.yaml -g typescript-fetch -o /tmp/client-32 2>&1 \
   | grep -vE "^\s+at |JsonParseException|Source: REDACTED|JAVA_TOOL_OPTIONS" | head -12
+
+step "OpenAPI 3.2 copy with dataValue examples: prism mock"
+sed 's/value:/dataValue:/' openapi-3.2.yaml > /tmp/openapi-3.2-datavalue.yaml
+npx redocly lint /tmp/openapi-3.2-datavalue.yaml 2>&1 | tail -2
+npx prism mock /tmp/openapi-3.2-datavalue.yaml > prism-32.log 2>&1 &
+sleep 8
+curl -s "http://127.0.0.1:4010/orders?status=pending" -H "$AUTH"; echo
+curl -s "http://127.0.0.1:4010/orders/ord_9999" -H "$AUTH" -H "Prefer: code=404"; echo
+stop_prism
 
 step "code-first: FastAPI"
 (cd code-first && .venv/bin/python main.py && .venv/bin/pip freeze | grep -iE "^(fastapi|pydantic|starlette)==")
