@@ -1,0 +1,185 @@
+Output of a real run on 2026-10-31: Python 3.13.18, fastapi 0.143.0, uvicorn 0.54.0, playwright 1.63.0 (Chromium 153.0.8010.12), Linux.
+API on http://localhost:20130, cross-site attacker on http://127.0.0.1:20131, same-site attacker on http://localhost:20132.
+
+########## python browser_demo.py
+Chromium 153.0.8010.12
+
+== 1. SameSite=None, cross-site form -> /unsafe/email
+  cookie: session; SameSite=None; Secure=True
+  alice opens http://127.0.0.1:20131/form (form posts to /unsafe/email)
+  browser sent cookie: yes, Sec-Fetch-Site: cross-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 200 {"email":"attacker@evil.example"}
+  alice's email is now: attacker@evil.example
+
+== 2. SameSite=Lax, cross-site form -> /unsafe/email
+  cookie: session; SameSite=Lax; Secure=False
+  alice opens http://127.0.0.1:20131/form (form posts to /unsafe/email)
+  browser sent cookie: no, Sec-Fetch-Site: cross-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 401 {"detail":"not logged in"}
+  alice's email is now: alice@example.com
+
+== 3. No SameSite attribute, cross-site form -> /unsafe/email
+  cookie: session; SameSite=Lax; Secure=False
+  alice opens http://127.0.0.1:20131/form (form posts to /unsafe/email)
+  browser sent cookie: yes, Sec-Fetch-Site: cross-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 200 {"email":"attacker@evil.example"}
+  alice's email is now: attacker@evil.example
+
+== 4. SameSite=Lax, SAME-site form (other port) -> /unsafe/email
+  cookie: session; SameSite=Lax; Secure=False
+  alice opens http://localhost:20132/form (form posts to /unsafe/email)
+  browser sent cookie: yes, Sec-Fetch-Site: same-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 200 {"email":"attacker@evil.example"}
+  alice's email is now: attacker@evil.example
+
+== 5. SameSite=Strict, SAME-site form (other port) -> /unsafe/email
+  cookie: session; SameSite=Strict; Secure=False
+  alice opens http://localhost:20132/form (form posts to /unsafe/email)
+  browser sent cookie: yes, Sec-Fetch-Site: same-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 200 {"email":"attacker@evil.example"}
+  alice's email is now: attacker@evil.example
+
+== 6. SameSite=None, cross-site form -> /json-only/email
+  cookie: session; SameSite=None; Secure=True
+  alice opens http://127.0.0.1:20131/form (form posts to /json-only/email)
+  browser sent cookie: yes, Sec-Fetch-Site: cross-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 422 {"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid d
+  alice's email is now: alice@example.com
+
+== 7. SameSite=None, cross-site fetch() with application/json -> /unsafe/email
+  cookie: session; SameSite=None; Secure=True
+  attacker page saw: blocked: TypeError: Failed to fetch
+  alice's email is now: alice@example.com
+
+== 8. SameSite=None, cross-site form -> /protected/email
+  cookie: session; SameSite=None; Secure=True
+  alice opens http://127.0.0.1:20131/form (form posts to /protected/email)
+  browser sent cookie: yes, Sec-Fetch-Site: cross-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 403 {"detail":"cross-origin request rejected (Sec-Fetch-Site: cross-site)"}
+  alice's email is now: alice@example.com
+
+== 9. SameSite=Lax, SAME-site form -> /protected/email
+  cookie: session; SameSite=Lax; Secure=False
+  alice opens http://localhost:20132/form (form posts to /protected/email)
+  browser sent cookie: yes, Sec-Fetch-Site: same-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 403 {"detail":"cross-origin request rejected (Sec-Fetch-Site: same-site)"}
+  alice's email is now: alice@example.com
+
+== 10. Attacker page tries to read the CSRF token
+  cookie: session; SameSite=None; Secure=True
+  attacker page saw: blocked: TypeError: Failed to fetch
+  alice's email is now: alice@example.com
+
+== 11. Cross-site form -> /bearer/email (token lives in JavaScript, not in a cookie)
+  cookie: session; SameSite=None; Secure=True
+  alice opens http://127.0.0.1:20131/form (form posts to /bearer/email)
+  browser sent cookie: yes, Sec-Fetch-Site: cross-site, Content-Type: text/plain
+  body: {"email":"attacker@evil.example","ignore":"="}
+  API answered: 401 {"detail":"missing or invalid bearer token"}
+  alice's email is now: alice@example.com
+
+== Our own page (same origin) sends the CSRF token
+  cookie: session; SameSite=Lax; Secure=False
+  browser sent cookie: yes, Sec-Fetch-Site: same-origin, X-CSRF-Token: 0b874d5b2da629f7...
+  API answered: 200 {"email":"alice@new-address.example"}
+
+########## WAIT_LAX=1 python browser_demo.py (scenario 3b only, from an earlier run of the same scenarios on the same day)
+== 3b. No SameSite attribute, cookie older than 2 minutes -> /unsafe/email
+  cookie: session; SameSite=Lax; Secure=False
+  waiting 125 s after login ...
+  alice opens http://127.0.0.1:20131/form (form posts to /unsafe/email)
+  browser sent cookie: no, Sec-Fetch-Site: cross-site
+  API answered: 401 {"detail":"not logged in"}
+  alice's email is now: alice@example.com
+
+########## ./demo.sh
+== 1. Log in: the API sets a session cookie and also returns a bearer token
+$ curl -X POST http://localhost:20130/login -H 'Content-Type: application/json' -d '{"username":"alice"}'
+HTTP/1.1 200 OK
+set-cookie: session=6pNL6GmgDVDUVSYOlkyn5A; HttpOnly; Path=/; SameSite=lax
+{"user":"alice","access_token":"f9s5MCQJs6us4qc_gdXniUNtgv9nzIjm","token_type":"Bearer"}
+
+== 2. Protected endpoint with the cookie but without a CSRF token
+$ curl -b cookies.txt -X POST http://localhost:20130/protected/email -H Content-Type: application/json -d {"email":"alice@new.example"}
+HTTP/1.1 403 Forbidden
+{"detail":"missing or invalid CSRF token"}
+
+== 3. Get a CSRF token, then send it in the X-CSRF-Token header
+csrf_token=1781868de6523d0306c09f2095875586.69bf465ecc97b94fea1f76084a644fefcc5090cab094c98e9c71f56f9cced280
+$ curl -b cookies.txt -X POST http://localhost:20130/protected/email -H Content-Type: application/json -H X-CSRF-Token: 1781868de6523d0306c09f2095875586.69bf465ecc97b94fea1f76084a644fefcc5090cab094c98e9c71f56f9cced280 -d {"email":"alice@new.example"}
+HTTP/1.1 200 OK
+{"email":"alice@new.example"}
+
+== 4. A forged token (right shape, wrong signature)
+$ curl -b cookies.txt -X POST http://localhost:20130/protected/email -H Content-Type: application/json -H X-CSRF-Token: 00000000000000000000000000000000.deadbeef -d {"email":"alice@new.example"}
+HTTP/1.1 403 Forbidden
+{"detail":"missing or invalid CSRF token"}
+
+== 5. The same request marked as cross-site, as a browser would mark it
+$ curl -b cookies.txt -X POST http://localhost:20130/protected/email -H Content-Type: application/json -H X-CSRF-Token: 1781868de6523d0306c09f2095875586.69bf465ecc97b94fea1f76084a644fefcc5090cab094c98e9c71f56f9cced280 -H Sec-Fetch-Site: cross-site -d {"email":"alice@new.example"}
+HTTP/1.1 403 Forbidden
+{"detail":"cross-origin request rejected (Sec-Fetch-Site: cross-site)"}
+
+== 6. An older browser without Sec-Fetch-Site, sending only Origin
+$ curl -b cookies.txt -X POST http://localhost:20130/protected/email -H Content-Type: application/json -H X-CSRF-Token: 1781868de6523d0306c09f2095875586.69bf465ecc97b94fea1f76084a644fefcc5090cab094c98e9c71f56f9cced280 -H Origin: https://evil.example -d {"email":"alice@new.example"}
+HTTP/1.1 403 Forbidden
+{"detail":"cross-origin request rejected (Origin: https://evil.example)"}
+
+== 7. The text/plain body an HTML form can send, against the unsafe and the JSON-only endpoints
+$ curl -b cookies.txt -X POST http://localhost:20130/unsafe/email -H Content-Type: text/plain --data-binary {"email":"attacker@evil.example","ignore":"="}
+HTTP/1.1 200 OK
+{"email":"attacker@evil.example"}
+
+$ curl -b cookies.txt -X POST http://localhost:20130/json-only/email -H Content-Type: text/plain --data-binary {"email":"attacker@evil.example","ignore":"="}
+HTTP/1.1 422 Unprocessable Content
+{"detail":[{"type":"model_attributes_type","loc":["body"],"msg":"Input should be a valid dictionary or object to extract fields from","input":"{\"email\":\"attacker@evil.example\",\"ignore\":\"=\"}"}]}
+
+== 8. Bearer endpoint: the cookie alone is not enough, the Authorization header is
+$ curl -b cookies.txt -X POST http://localhost:20130/bearer/email -H Content-Type: application/json -d {"email":"alice@new.example"}
+HTTP/1.1 401 Unauthorized
+{"detail":"missing or invalid bearer token"}
+
+$ curl -X POST http://localhost:20130/bearer/email -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d '{"email":"alice@new.example"}'
+HTTP/1.1 200 OK
+{"email":"alice@new.example"}
+
+########## API log: write requests from browser_demo.py and demo.sh (one line per request the API received)
+API  POST /unsafe/email cookie=yes sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=text/plain -> 200
+API  POST /unsafe/email cookie=no sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=text/plain -> 401
+API  POST /unsafe/email cookie=yes sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=text/plain -> 200
+API  POST /unsafe/email cookie=yes sec-fetch-site=same-site origin=http://localhost:20132 content-type=text/plain -> 200
+API  POST /unsafe/email cookie=yes sec-fetch-site=same-site origin=http://localhost:20132 content-type=text/plain -> 200
+API  POST /json-only/email cookie=yes sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=text/plain -> 422
+API  OPTIONS /unsafe/email cookie=no sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=- -> 405
+API  POST /protected/email cookie=yes sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=text/plain -> 403
+API  POST /protected/email cookie=yes sec-fetch-site=same-site origin=http://localhost:20132 content-type=text/plain -> 403
+API  GET /api/csrf-token cookie=yes sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=- -> 200
+API  POST /bearer/email cookie=yes sec-fetch-site=cross-site origin=http://127.0.0.1:20131 content-type=text/plain -> 401
+API  GET /api/csrf-token cookie=yes sec-fetch-site=same-origin origin=- content-type=- -> 200
+API  POST /protected/email cookie=yes sec-fetch-site=same-origin origin=http://localhost:20130 content-type=application/json -> 200
+API  POST /protected/email cookie=yes sec-fetch-site=- origin=- content-type=application/json -> 403
+API  GET /api/csrf-token cookie=yes sec-fetch-site=- origin=- content-type=- -> 200
+API  POST /protected/email cookie=yes sec-fetch-site=- origin=- content-type=application/json -> 200
+API  POST /protected/email cookie=yes sec-fetch-site=- origin=- content-type=application/json -> 403
+API  POST /protected/email cookie=yes sec-fetch-site=cross-site origin=- content-type=application/json -> 403
+API  POST /protected/email cookie=yes sec-fetch-site=- origin=https://evil.example content-type=application/json -> 403
+API  POST /unsafe/email cookie=yes sec-fetch-site=- origin=- content-type=text/plain -> 200
+API  POST /json-only/email cookie=yes sec-fetch-site=- origin=- content-type=text/plain -> 422
+API  POST /bearer/email cookie=yes sec-fetch-site=- origin=- content-type=application/json -> 401
+API  POST /bearer/email cookie=no sec-fetch-site=- origin=- content-type=application/json -> 200
+
+########## Set-Cookie for each ?samesite= value of POST /login
+$ curl -i -X POST "http://localhost:20130/login?samesite=none" -H 'Content-Type: application/json' -d '{"username":"alice"}'
+set-cookie: session=kXBt7Hd7OMf9dc_KgLGPaw; HttpOnly; Path=/; SameSite=none; Secure
+$ curl -i -X POST "http://localhost:20130/login?samesite=lax" -H 'Content-Type: application/json' -d '{"username":"alice"}'
+set-cookie: session=RsSKrG_JFuZ7PKFKbc7UOg; HttpOnly; Path=/; SameSite=lax
+$ curl -i -X POST "http://localhost:20130/login?samesite=unset" -H 'Content-Type: application/json' -d '{"username":"alice"}'
+set-cookie: session=o1qoSaLXwNwukLUh0b790w; HttpOnly; Path=/

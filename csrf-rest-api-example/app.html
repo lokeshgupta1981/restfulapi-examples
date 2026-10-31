@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Bookstore account</title></head>
+<body>
+<h1>Bookstore account</h1>
+<input id="email" value="alice@new-address.example">
+<button id="save" onclick="saveEmail()">Save</button>
+<pre id="out"></pre>
+<script>
+// Our own page, served from the same origin as the API.
+async function saveEmail() {
+  // 1. Ask the API for a CSRF token. Only same-origin code can read this response.
+  const { csrf_token } = await fetch('/api/csrf-token').then(r => r.json());
+
+  // 2. Send it back in a custom header with the state-changing request.
+  const res = await fetch('/protected/email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
+    body: JSON.stringify({ email: document.getElementById('email').value })
+  });
+  document.getElementById('out').textContent = res.status + ' ' + await res.text();
+}
+</script>
+</body>
+</html>
