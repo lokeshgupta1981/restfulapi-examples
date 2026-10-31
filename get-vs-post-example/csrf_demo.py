@@ -22,7 +22,7 @@ with sync_playwright() as p:
     for attack in ["link-get.html", "img-get.html", "form-post.html"]:
         page.goto(f"{ATTACKER}/{attack}")
         page.wait_for_load_state("networkidle")
-        time.sleep (0.5)
+        time.sleep(0.5)
     browser.close()
 
 with urllib.request.urlopen(f"{API}/cancel-log") as response:
