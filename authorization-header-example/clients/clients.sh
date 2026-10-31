@@ -19,8 +19,10 @@ for target in to-same to-port to-host; do
   curl -s -L -u reports-app:demo-pass-123 "$BASE/$target"; echo
 done
 
-echo '--- curl --location-trusted -u, redirect to-host'
-curl -s --location-trusted -u reports-app:demo-pass-123 "$BASE/to-host"; echo
+for target in to-same to-port to-host; do
+  echo "--- curl --location-trusted -u, redirect $target"
+  curl -s --location-trusted -u reports-app:demo-pass-123 "$BASE/$target"; echo
+done
 
 echo '--- curl through a proxy: -U sends Proxy-Authorization, -u sends Authorization'
 curl -s -x http://127.0.0.1:9772 -U proxy-user:demo-proxy-pass -u reports-app:demo-pass-123 http://orders.example/echo; echo

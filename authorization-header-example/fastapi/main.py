@@ -1,9 +1,11 @@
 import secrets
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import (HTTPAuthorizationCredentials, HTTPBasic,
                               HTTPBasicCredentials, HTTPBearer)
+
+from parse_header import scheme_for_log
 
 # Demo values for local tests only.
 DEMO_USER = "reports-app"
@@ -13,6 +15,15 @@ DEMO_TOKEN = (Path(__file__).parent.parent / "demo-token.txt").read_text().strip
 app = FastAPI()
 basic_scheme = HTTPBasic(realm="orders")
 bearer_scheme = HTTPBearer()
+
+
+@app.middleware("http")
+async def log_scheme_only(request: Request, call_next):
+    response = await call_next(request)
+    print(request.method, request.url.path,
+          "auth-scheme=" + scheme_for_log(request.headers.get("authorization")),
+          response.status_code, flush=True)
+    return response
 
 
 @app.get("/basic/orders")

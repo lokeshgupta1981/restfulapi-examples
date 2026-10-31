@@ -1,9 +1,62 @@
-=== Basic header bytes
+Output of ./run_all.sh on 2026-10-31 (Linux, Python 3.13.18, Node.js 22.23.4, OpenJDK 25.0.4.1, curl 8.5.0, Chromium 153 via Playwright 1.63.0).
+Dates and ETag values differ on every run.
+
+=== 1. FastAPI: request without credentials, then with Basic credentials
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:23:20 GMT
+server: uvicorn
+www-authenticate: Basic realm="orders"
+content-length: 30
+content-type: application/json
+
+{"detail":"Not authenticated"}
+---
+> GET /basic/orders HTTP/1.1
+> Host: 127.0.0.1:9762
+> Authorization: Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
+< HTTP/1.1 200 OK
+< content-type: application/json
+{ [43 bytes data]
+{"user":"reports-app","orders":[1001,1002]}
+
+=== 1b. FastAPI: Bearer token
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:23:20 GMT
+server: uvicorn
+content-length: 43
+content-type: application/json
+
+{"user":"reports-app","orders":[1001,1002]}
+---
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:23:20 GMT
+server: uvicorn
+www-authenticate: Bearer
+content-length: 30
+content-type: application/json
+
+{"detail":"Not authenticated"}
+=== 2. Basic header bytes
    r   e   p   o   r   t   s   -   a   p   p   :   d   e   m   o
    -   p   a   s   s   -   1   2   3
 cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
+cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMwo=
+25
+echo value sent to FastAPI -> 401
 
-=== Express parsing helpers (express/parse_demo.mjs)
+=== 3. Decoding the demo JWT claims
+[{'alg': 'HS256', 'typ': 'JWT'}, {'sub': 'reports-app', 'scope': 'orders.read', 'exp': 1924992000}]
+
+=== 4. Parsing by hand (fastapi/parse_header.py)
+Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==     -> ('basic', 'cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==') ('reports-app', 'demo-pass-123')
+basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==     -> ('basic', 'cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==') ('reports-app', 'demo-pass-123')
+Basic  cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==    -> ('basic', 'cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==') ('reports-app', 'demo-pass-123')
+BasiccmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==      -> None 
+Basic reports-app:demo-pass-123                -> ('basic', 'reports-app:demo-pass-123') 
+Bearer demo-token-123                          -> ('bearer', 'demo-token-123') 
+log: Bearer (malformed)
+
+=== 5. Express parsing helpers (express/parse_demo.mjs)
 { name: 'reports-app', pass: 'demo-pass-123' }
 { name: 'reports-app', pass: 'demo-pass-123' }
 demo-token-123
@@ -12,7 +65,7 @@ BasiccmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
 (malformed)
 Bearer
 
-=== Probe grid (Express 9761, FastAPI 9762, Spring Boot 9763)
+=== 6. Probe grid (Express 9761, FastAPI 9762, Spring Boot 9763)
 Authorization header sent                     Expr  Fast   Spr
 Basic <base64>                                 200   200   200
 basic <base64> (lowercase scheme)              200   200   200
@@ -33,40 +86,31 @@ Bearer "<token>" (quoted)                      401   401   401
 Token <token> (wrong scheme)                   401   401   401
 two headers: Bearer <token> twice              200   200   200
 
-=== Express 401 response without credentials
+=== 7. Express 401 response without credentials
 HTTP/1.1 401 Unauthorized
 X-Powered-By: Express
 WWW-Authenticate: Basic realm="orders", charset="UTF-8"
 Content-Type: application/json; charset=utf-8
 Content-Length: 42
 ETag: W/"2a-WjHYhryzoIS9NGA9fmN+EYF/Zow"
-Date: Mon, 05 Oct 2026 12:24:23 GMT
+Date: Sat, 31 Oct 2026 06:23:22 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
 {"error":"missing or invalid credentials"}
-=== Spring Boot response to Bearer with two spaces
+=== 8. Spring Boot response to Bearer with two spaces
 HTTP/1.1 401 
 WWW-Authenticate: Bearer error="invalid_token", error_description="Bearer token is malformed", error_uri="https://tools.ietf.org/html/rfc6750#section-3.1", resource_metadata="http://127.0.0.1:9763/.well-known/oauth-protected-resource"
-=== FastAPI response to Basic without padding
+=== 9. FastAPI response to Basic without padding
 HTTP/1.1 401 Unauthorized
-date: Mon, 05 Oct 2026 12:24:22 GMT
+date: Sat, 31 Oct 2026 06:23:21 GMT
 server: uvicorn
 www-authenticate: Basic realm="orders"
 content-length: 30
 content-type: application/json
 
 {"detail":"Not authenticated"}
-=== FastAPI response with no header on /bearer/orders
-HTTP/1.1 401 Unauthorized
-date: Mon, 05 Oct 2026 12:24:22 GMT
-server: uvicorn
-www-authenticate: Bearer
-content-length: 30
-content-type: application/json
-
-{"detail":"Not authenticated"}
-=== curl
+=== 10. curl
 --- curl -u (Basic built by curl)
 {"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
 --- curl -H with a Bearer token
@@ -83,51 +127,58 @@ content-type: application/json
 {"host": "127.0.0.1:9772", "authorization": [], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
 --- curl -L -u, redirect to-host
 {"host": "localhost:9771", "authorization": [], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl --location-trusted -u, redirect to-same
+{"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
+--- curl --location-trusted -u, redirect to-port
+{"host": "127.0.0.1:9772", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
 --- curl --location-trusted -u, redirect to-host
 {"host": "localhost:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "curl/8.5.0"}
 --- curl through a proxy: -U sends Proxy-Authorization, -u sends Authorization
 {"host": "orders.example", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": ["Basic cHJveHktdXNlcjpkZW1vLXByb3h5LXBhc3M="], "user_agent": "curl/8.5.0"}
 
-=== Python requests
+=== 11. Python requests
 ['Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==']
 ['Bearer demo-token-123']
 redirect to-same  127.0.0.1:9771 ['Bearer demo-token-123']
 redirect to-port  127.0.0.1:9772 []
 redirect to-host  localhost:9771 []
 
-=== Node.js fetch
+=== 12. Node.js fetch
 Basic by hand   [ 'Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==' ]
 redirect to-same  127.0.0.1:9771 [ 'Bearer demo-token-123' ]
 redirect to-port  127.0.0.1:9772 []
 redirect to-host  localhost:9771 []
 
-=== Browser-style Basic encoding (btoa and TextEncoder)
+=== 13. Browser-style Basic encoding (btoa and TextEncoder)
 Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw==
 UTF-8 via encoder    Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbDqS0xMjM=
 btoa() on the text   Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbpLTEyMw==
 btoa() with a euro sign throws InvalidCharacterError
 
-=== Java HttpClient
-Basic by hand   {"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
-redirect to-same  {"host": "127.0.0.1:9771", "authorization": ["Bearer demo-token-123"], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
-redirect to-port  {"host": "127.0.0.1:9772", "authorization": [], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
-redirect to-host  {"host": "localhost:9771", "authorization": [], "proxy_authorization": [], "user_agent": "Java-http-client/21.0.12.1"}
+=== 14. Java HttpClient
+Basic by hand   {"host": "127.0.0.1:9771", "authorization": ["Basic cmVwb3J0cy1hcHA6ZGVtby1wYXNzLTEyMw=="], "proxy_authorization": [], "user_agent": "Java-http-client/25.0.4.1"}
+redirect to-same  {"host": "127.0.0.1:9771", "authorization": ["Bearer demo-token-123"], "proxy_authorization": [], "user_agent": "Java-http-client/25.0.4.1"}
+redirect to-port  {"host": "127.0.0.1:9772", "authorization": [], "proxy_authorization": [], "user_agent": "Java-http-client/25.0.4.1"}
+redirect to-host  {"host": "localhost:9771", "authorization": [], "proxy_authorization": [], "user_agent": "Java-http-client/25.0.4.1"}
 
-=== Non-ASCII password in Basic
+=== 15. Non-ASCII password in Basic
 requests sends     Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbpLTEyMw==
 decoded bytes      b'reports-app:demo-caf\xe9-123'
 UTF-8 by hand      Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbDqS0xMjM=
 decoded bytes      b'reports-app:demo-caf\xc3\xa9-123'
 requests with bytes Basic cmVwb3J0cy1hcHA6ZGVtby1jYWbDqS0xMjM=
+--- FastAPI with the wrong ASCII password, then with the UTF-8 value
+{"detail":"invalid credentials"} 401
+{"detail":"Not authenticated"} 401
 
-=== Chromium CORS and redirect check
+=== 16. Chromium CORS and redirect check
 /orders -> 200 {"orders": [1001, 1002]}
 /orders-wildcard -> 200 {"orders": [1001, 1002]}
 /redirect-same -> 200 {"authorization": "Bearer demo-token-123"}
 /redirect-port -> 200 {"authorization": null}
 /redirect -> 200 {"authorization": null}
 
-=== Express server log during probe.sh
+=== Express server log
 Express on http://127.0.0.1:9761
 GET /basic/orders auth-scheme=Basic
 GET /basic/orders auth-scheme=basic
@@ -147,6 +198,35 @@ GET /bearer/orders auth-scheme=Bearer
 GET /bearer/orders auth-scheme=(malformed)
 GET /bearer/orders auth-scheme=Token
 GET /bearer/orders auth-scheme=Bearer
+GET /basic/orders auth-scheme=-
+
+=== FastAPI server log
+GET /basic/orders auth-scheme=- 401
+GET /basic/orders auth-scheme=Basic 200
+GET /bearer/orders auth-scheme=Bearer 200
+GET /bearer/orders auth-scheme=- 401
+GET /basic/orders auth-scheme=Basic 401
+GET /basic/orders auth-scheme=Basic 200
+GET /basic/orders auth-scheme=basic 200
+GET /basic/orders auth-scheme=BASIC 200
+GET /basic/orders auth-scheme=(malformed) 401
+GET /basic/orders auth-scheme=Basic 200
+GET /basic/orders auth-scheme=Basic 401
+GET /basic/orders auth-scheme=Basic 401
+GET /basic/orders auth-scheme=Basic 200
+GET /basic/orders auth-scheme=Basic 401
+GET /basic/orders auth-scheme=- 401
+GET /bearer/orders auth-scheme=Bearer 200
+GET /bearer/orders auth-scheme=bearer 200
+GET /bearer/orders auth-scheme=(malformed) 401
+GET /bearer/orders auth-scheme=Bearer 200
+GET /bearer/orders auth-scheme=Bearer 401
+GET /bearer/orders auth-scheme=(malformed) 401
+GET /bearer/orders auth-scheme=Token 401
+GET /bearer/orders auth-scheme=Bearer 200
+GET /basic/orders auth-scheme=Basic 401
+GET /basic/orders auth-scheme=Basic 401
+GET /basic/orders auth-scheme=Basic 401
 
 === CORS demo server log
 API got OPTIONS /orders Access-Control-Request-Headers: authorization
