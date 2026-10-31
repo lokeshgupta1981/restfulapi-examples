@@ -1,0 +1,138 @@
+# Captured 2026-10-31T06:25:56Z on Linux, Python 3.13.18
+# Servers started with ISSUER=http://127.0.0.1:20060 API_URL=http://127.0.0.1:20061
+#   uvicorn auth_server:app --port 20060 ; uvicorn bookstore_api:app --port 20061
+# (the defaults in the code and README are ports 8000 and 8001)
+
+## ./demo.sh
+### 1. Which scopes does the API use? (protected resource metadata)
+{
+  "resource": "http://127.0.0.1:20061",
+  "authorization_servers": [
+    "http://127.0.0.1:20060"
+  ],
+  "scopes_supported": [
+    "books:read",
+    "orders:read",
+    "orders:write",
+    "orders:refund"
+  ],
+  "bearer_methods_supported": [
+    "header"
+  ]
+}
+
+### 2. reading-tracker asks for orders:read orders:write
+GET http://127.0.0.1:20060/authorize?response_type=code&client_id=reading-tracker&redirect_uri=http%3A%2F%2F127.0.0.1%3A8099%2Fcallback&scope=orders%3Aread+orders%3Awrite&state=VL9FmnxsFpU&code_challenge=mVvODiqH6mtuxqlORS0FEyoqFhR8WFhT8lZcBxxC8Mo&code_challenge_method=S256&login_hint=asha
+-> 302 Location: http://127.0.0.1:8099/callback?code=AqlwtWGyL2zBxPHUktDegoiEINgidqYq&state=VL9FmnxsFpU
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "scope": "orders:read"
+}
+
+### 3. An unknown scope
+GET http://127.0.0.1:20060/authorize?response_type=code&client_id=bookshop-web&redirect_uri=http%3A%2F%2F127.0.0.1%3A8099%2Fcallback&scope=orders%3Adelete&state=kaSdB-pSMN8&code_challenge=w7Q-Z_k1MYLAlHW989gpsvKYIMBgGZKwEocjHj_6hrg&code_challenge_method=S256&login_hint=asha
+-> 302 Location: http://127.0.0.1:8099/callback?error=invalid_scope&error_description=Unknown+scope%3A+orders%3Adelete&state=kaSdB-pSMN8
+{
+  "error": "invalid_scope",
+  "error_description": "Unknown scope: orders:delete"
+}
+
+### 4. The scope inside the access token (JWT payload)
+{
+  "iss": "http://127.0.0.1:20060",
+  "sub": "asha",
+  "aud": "http://127.0.0.1:20061",
+  "client_id": "reading-tracker",
+  "scope": "orders:read",
+  "roles": [
+    "customer"
+  ],
+  "iat": 1793427957,
+  "exp": 1793428257,
+  "jti": "36b153a5-3fd9-48f8-8a5f-71e201c53898"
+}
+
+### 5. No token
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:25:56 GMT
+server: uvicorn
+www-authenticate: Bearer resource_metadata="http://127.0.0.1:20061/.well-known/oauth-protected-resource"
+content-length: 85
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"No access token"}
+
+### 6. GET /orders with orders:read
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:25:56 GMT
+server: uvicorn
+content-length: 127
+content-type: application/json
+
+[{"id":"o-1001","customer":"asha","book":"b-1","status":"paid"},{"id":"o-1002","customer":"asha","book":"b-2","status":"paid"}]
+
+### 7. POST /orders with only orders:read
+HTTP/1.1 403 Forbidden
+date: Sat, 31 Oct 2026 06:25:56 GMT
+server: uvicorn
+www-authenticate: Bearer error="insufficient_scope", scope="orders:write", resource_metadata="http://127.0.0.1:20061/.well-known/oauth-protected-resource", error_description="This request needs the scope orders:write"
+content-length: 108
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs the scope orders:write"}
+
+### 8. Asha reads Meera's order with orders:read
+HTTP/1.1 404 Not Found
+date: Sat, 31 Oct 2026 06:25:56 GMT
+server: uvicorn
+content-length: 89
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Order o-2001 not found"}
+
+### 9. A token that was tampered with
+HTTP/1.1 401 Unauthorized
+date: Sat, 31 Oct 2026 06:25:56 GMT
+server: uvicorn
+www-authenticate: Bearer error="invalid_token", error_description="The access token is invalid or expired"
+content-length: 108
+content-type: application/problem+json
+
+{"type":"about:blank","title":"Unauthorized","status":401,"detail":"The access token is invalid or expired"}
+
+### 10. Asha (customer) asks for orders:refund
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "scope": "orders:read"
+}
+
+### 11. Ravi (staff) asks for orders:refund and refunds o-2001
+{"sub":"ravi","scope":"orders:refund","roles":["staff"]}
+HTTP/1.1 200 OK
+date: Sat, 31 Oct 2026 06:25:57 GMT
+server: uvicorn
+content-length: 67
+content-type: application/json
+
+{"id":"o-2001","customer":"meera","book":"b-1","status":"refunded"}
+
+## python client.py
+Sign in asha with read-only scopes:
+  token granted with scope: books:read orders:read
+  GET /orders -> 200
+Asha places an order:
+  POST /orders -> 403
+  API asks for scope: orders:write
+  token granted with scope: books:read orders:read orders:write
+  POST /orders -> 201
+  body: {"id":"o-1003","customer":"asha","book":"b-2","status":"paid"}
+Asha tries a refund (only staff may grant orders:refund):
+  POST /orders/o-1001/refund -> 403
+  API asks for scope: orders:refund
+  token granted with scope: books:read orders:read orders:write
+  not granted, so we stop instead of retrying
+  body: {"type":"about:blank","title":"Forbidden","status":403,"detail":"This request needs the scope orders:refund"}
