@@ -1,0 +1,116 @@
+Output of one run on Linux, 2026-10-31, Python 3.13.18:
+PYTHON=.venv/bin/python AUTH_PORT=20220 API_PORT=20221 ./demo.sh   (JWKS_CACHE_SECONDS=60, the demo default)
+
+== 1. Discovery: where are the keys?
+$ curl http://127.0.0.1:20220/.well-known/oauth-authorization-server
+{
+    "issuer": "http://127.0.0.1:20220",
+    "token_endpoint": "http://127.0.0.1:20220/token",
+    "jwks_uri": "http://127.0.0.1:20220/.well-known/jwks.json",
+    "grant_types_supported": [
+        "client_credentials"
+    ],
+    "token_endpoint_auth_methods_supported": [
+        "client_secret_basic"
+    ]
+}
+
+== 2. The JWKS endpoint
+$ curl -i http://127.0.0.1:20220/.well-known/jwks.json
+HTTP/1.1 200 OK
+server: uvicorn
+cache-control: public, max-age=300
+content-length: 428
+content-type: application/json
+
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "n": "h3EVFr-RhuSJlzaCswUNCpyVCEMb3ytEK1o4z3qmk8exViiamZOtm_vUxPP4j-lgDDN-NiNMUlOP6Eau7_y2gbqtQhmbp1zvBXETYjW7EAe8RaHnIHzEwnxxdO4v6vKza5WCjgaoCgPgGMuB5KMIS8ETO6oe7T070UXCOtaIMhHSLvRf8PPtL5dlWdVBCd8z-f5Ms7WcJhdq4E2LkCF_mfEturlwQMiYlL9TGag_fhEqPZSZrJnuAMVRmvPalZmVqteL52IzK1GplCGzMseLy4ltfPHPMXtp0RdwdGh2_vTYElycLrLWQovsTjf7DMIxNY9Di6sIAmc2lHy2Exy5zQ",
+      "e": "AQAB",
+      "kid": "2026-10-a",
+      "use": "sig",
+      "alg": "RS256"
+    }
+  ]
+}
+
+== 3. Get a token and look at its header
+$ curl -u orders-app:demo-secret-not-real -d grant_type=client_credentials http://127.0.0.1:20220/token
+{"access_token":"eyJhbGciOiJSUzI1NiIsImtpZCI6IjIwMjYtMTAtYSIsInR5cCI6ImF0K2p3dCJ9.eyJpc3Mi
+...
+Header of token A:
+{'alg': 'RS256', 'kid': '2026-10-a', 'typ': 'at+jwt'}
+
+== 4. Verify by hand (no JWT library)
+1. Token header: {'alg': 'RS256', 'kid': '2026-10-a', 'typ': 'at+jwt'}
+2. JWKS from http://127.0.0.1:20220/.well-known/jwks.json has kids ['2026-10-a']
+3. Picked key kid=2026-10-a kty=RSA alg=RS256
+4. Signature valid
+5. Claims: {'iss': 'http://127.0.0.1:20220', 'aud': 'orders-api', 'sub': 'orders-app', 'scope': 'orders:read', 'exp': 1793429016} -> accepted
+
+== 5. The Orders API verifies token A (first call fetches the JWKS)
+$ curl -H 'Authorization: Bearer <token A>' http://127.0.0.1:20221/orders
+{"client":"orders-app","orders":[{"id":1042,"total":250}]}  -> HTTP 200
+[orders-api t=  2.3s] JWKS fetch #1: kids=['2026-10-a']
+Second call with the same token, no fetch:
+$ curl -H 'Authorization: Bearer <token A>' http://127.0.0.1:20221/orders
+{"client":"orders-app","orders":[{"id":1042,"total":250}]}  -> HTTP 200
+After 8 more calls:
+{"fetches":1}
+
+== 6. Forged tokens
+$ curl -H 'Authorization: Bearer <forged, kid=attacker-key>' http://127.0.0.1:20221/orders
+{"error":"invalid_token","error_description":"Unable to find a signing key that matches: \"attacker-key\""}  -> HTTP 401
+$ curl -H 'Authorization: Bearer <forged, kid=2026-10-a>' http://127.0.0.1:20221/orders
+{"error":"invalid_token","error_description":"Signature verification failed"}  -> HTTP 401
+After 20 forged tokens with random kids:
+{"fetches":1}
+
+== 7. Rotation done too fast: new EC key signs immediately
+{"2026-10-a":"retired","2026-10-b":"active"}
+The new key in the JWKS:
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "V-VhnDDmtRVMumsLlxU6R-zXh8-vCVqpcQm5TFAdTrA",
+  "y": "xsS9jyCHm77WAFhGUHX8l_WHu0orNJ9O4RMxdFleKXM",
+  "kid": "2026-10-b",
+  "use": "sig",
+  "alg": "ES256"
+}
+Header of token B:
+{'alg': 'ES256', 'kid': '2026-10-b', 'typ': 'at+jwt'}
+$ curl -H 'Authorization: Bearer <token B>' http://127.0.0.1:20221/orders
+{"error":"invalid_token","error_description":"Unable to find a signing key that matches: \"2026-10-b\""}  -> HTTP 401
+Waiting 31 seconds for the refresh cooldown to pass...
+$ curl -H 'Authorization: Bearer <token B>' http://127.0.0.1:20221/orders
+{"client":"orders-app","orders":[{"id":1042,"total":250}]}  -> HTTP 200
+[orders-api t= 41.3s] JWKS fetch #2: kids=['2026-10-a', '2026-10-b']
+
+== 8. Rotation done right: publish first, sign later
+{"2026-10-a":"retired","2026-10-b":"active","2026-10-c":"next"}
+Key 2026-10-c is published but not used. Waiting 61 seconds for the API cache to expire...
+$ curl -H 'Authorization: Bearer <token B>' http://127.0.0.1:20221/orders
+{"client":"orders-app","orders":[{"id":1042,"total":250}]}  -> HTTP 200
+[orders-api t=102.7s] JWKS fetch #3: kids=['2026-10-a', '2026-10-b', '2026-10-c']
+{"2026-10-a":"retired","2026-10-b":"retired","2026-10-c":"active"}
+Header of token C:
+{'alg': 'RS256', 'kid': '2026-10-c', 'typ': 'at+jwt'}
+$ curl -H 'Authorization: Bearer <token C>' http://127.0.0.1:20221/orders
+{"client":"orders-app","orders":[{"id":1042,"total":250}]}  -> HTTP 200
+
+== 9. Remove the first key from the JWKS
+{"2026-10-b":"retired","2026-10-c":"active"}
+$ curl http://127.0.0.1:20220/.well-known/jwks.json  (kids only)
+['2026-10-b', '2026-10-c']
+Token A is still accepted while the API's cached copy has key 2026-10-a:
+$ curl -H 'Authorization: Bearer <token A>' http://127.0.0.1:20221/orders
+{"client":"orders-app","orders":[{"id":1042,"total":250}]}  -> HTTP 200
+Waiting 61 seconds for the API cache to expire...
+$ curl -H 'Authorization: Bearer <token A>' http://127.0.0.1:20221/orders
+{"error":"invalid_token","error_description":"Unable to find a signing key that matches: \"2026-10-a\""}  -> HTTP 401
+[orders-api t=164.0s] JWKS fetch #4: kids=['2026-10-b', '2026-10-c']
+Total JWKS fetches by the Orders API:
+{"fetches":4}
