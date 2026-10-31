@@ -1,0 +1,73 @@
+Output of: BASE_PORT=29870 ./demo.sh
+Run on Linux, Python 3.13.18, curl 8.5.0, 2026-10-31. Session IDs, tokens and timestamps change on every run.
+
+Two instances, SESSION_STORE=memory, DENYLIST=0
+
+== 1. Session login on A (response headers)
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 31
+content-type: application/json
+set-cookie: sid=XolltRcbKbk6xSq9kgo8jAB6LfD_gK93oiG8ppQyjfE; HttpOnly; Max-Age=1800; Path=/; SameSite=lax; Secure
+
+{"user":"alice","instance":"A"}
+
+== 2. Orders on A with the session cookie
+{"user":"alice","role":"admin","orders":[{"id":1001,"book":"REST in Practice","status":"shipped"}],"instance":"A"}  -> HTTP 200
+
+== 3. Same cookie sent to instance B
+{"detail":"no valid session"}  -> HTTP 401
+
+== 4. Token login on A
+{"access_token": "eyJhbGciOiJIUzI1NiIsInR5...", "token_type": "Bearer", "expires_in": 900}
+token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5MzQyODE5NywiZXhwIjoxNzkzNDI5MDk3LCJqdGkiOiI5MzA0MDZkYy03Mzg4LTRkOTUtYmEyNS02ZjE4NmMyZWI2M2EifQ.kiZm-_tUgX2kxBZ8g-CyfTvDh4pCmwaiq6EqOwRlcEk
+
+== 5. Anyone can read the token payload (base64url, not encrypted)
+{"sub": "alice", "role": "admin", "iat": 1793428197, "exp": 1793429097, "jti": "930406dc-7388-4d95-ba25-6f186c2eb63a"}
+
+== 6. Orders on A and on B with the same token
+{"user":"alice","role":"admin","orders":[{"id":1001,"book":"REST in Practice","status":"shipped"}],"instance":"A"}  -> HTTP 200
+{"user":"alice","role":"admin","orders":[{"id":1001,"book":"REST in Practice","status":"shipped"}],"instance":"B"}  -> HTTP 200
+
+== 7. Tampered token (role changed to superadmin in the payload)
+HTTP/1.1 401 Unauthorized
+server: uvicorn
+www-authenticate: Bearer error="invalid_token"
+content-length: 26
+content-type: application/json
+
+{"detail":"invalid token"}
+
+== 8. Header sizes on every request
+Cookie header bytes: 55
+Authorization header bytes: 249
+
+== 9. Logout, then reuse the old credential
+session logout -> HTTP 204
+{"detail":"no valid session"}  -> HTTP 401
+token logout -> HTTP 204
+{"user":"alice","role":"admin","orders":[{"id":1001,"book":"REST in Practice","status":"shipped"}],"instance":"A"}  -> HTTP 200
+
+== 10. Alice is demoted from admin to customer while logged in
+{"report":"daily sales","user":"alice","instance":"A"}  -> HTTP 200
+{"report":"daily sales","user":"alice","instance":"A"}  -> HTTP 200
+demote -> HTTP 204
+{"detail":"role is customer, admin required"}  -> HTTP 403
+{"report":"daily sales","user":"alice","instance":"A"}  -> HTTP 200
+
+Restarted: two instances, SESSION_STORE=shared, DENYLIST=1
+
+== 11. Session created on A, used on B (shared store)
+{"user":"alice","role":"admin","orders":[{"id":1001,"book":"REST in Practice","status":"shipped"}],"instance":"B"}  -> HTTP 200
+
+== 12. Token logout on A with a denylist, then reuse on B
+{"user":"alice","role":"admin","orders":[{"id":1001,"book":"REST in Practice","status":"shipped"}],"instance":"B"}  -> HTTP 200
+token logout -> HTTP 204
+HTTP/1.1 401 Unauthorized
+server: uvicorn
+www-authenticate: Bearer error="invalid_token"
+content-length: 26
+content-type: application/json
+
+{"detail":"token revoked"}
+
